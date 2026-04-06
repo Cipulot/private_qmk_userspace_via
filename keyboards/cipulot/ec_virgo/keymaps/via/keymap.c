@@ -1,4 +1,4 @@
-/* Copyright 2023 Cipulot
+/* Copyright 2026 Cipulot
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,6 +15,7 @@
  */
 
 #include QMK_KEYBOARD_H
+#include "keyboards/cipulot/common/ec_switch_matrix.h"
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format off
@@ -26,7 +27,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         KC_LSFT, KC_NUBS, KC_Z,    KC_X,    KC_C,  KC_V,   KC_B,      KC_B,   KC_N,  KC_M,    KC_COMM, KC_DOT,  KC_SLSH, KC_RSFT,  MO(1),                        KC_UP,
         KC_LCTL,          KC_LGUI, KC_LALT,        KC_SPC,            KC_SPC,        KC_RALT, KC_RGUI,          KC_RCTL,                                KC_LEFT, KC_DOWN, KC_RIGHT),
     [1] = LAYOUT(
-        QK_BOOT, NK_TOGG, _______, _______, _______, _______,               _______, _______, _______,          _______, _______, _______, _______,            _______, _______, _______,
+        QK_BOOT, NK_TOGG, SE_TOGG, _______, _______, _______,               _______, _______, _______,          _______, _______, _______, _______,            _______, _______, _______,
         _______, _______, _______, _______, _______, _______, _______,      _______, _______, _______, _______, _______, _______, _______, _______,            _______, _______, _______,
         _______, _______, _______, _______, _______, _______,               _______, _______, _______, _______, _______, _______, _______, _______, _______,   _______, _______, _______,
         _______, _______, _______, _______, _______, _______,               _______, _______, _______, _______, _______, _______, _______, _______,

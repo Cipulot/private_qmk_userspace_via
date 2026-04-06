@@ -1,4 +1,4 @@
-/* Copyright 2023 Cipulot
+/* Copyright 2026 Cipulot
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,5 +16,4 @@
 
 #pragma once
 
-// This is the firmware version for VIA support to avoid conflicts on menu fetching
-#define VIA_FIRMWARE_VERSION 1
+#define VIA_FIRMWARE_VERSION 3

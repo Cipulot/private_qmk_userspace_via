@@ -1,4 +1,4 @@
-/* Copyright 2024 Cipulot
+/* Copyright 2026 Cipulot
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,3 +17,4 @@
 #pragma once
 
 #define VIA_EEPROM_LAYOUT_OPTIONS_SIZE 2
+#define VIA_FIRMWARE_VERSION 2

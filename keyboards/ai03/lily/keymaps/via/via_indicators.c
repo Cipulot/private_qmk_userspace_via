@@ -1,4 +1,4 @@
-/* Copyright 2025 Cipulot
+/* Copyright 2026 Cipulot
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,7 +14,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "eeprom_tools.h"
 #include "lily.h"
 #include "print.h"
 #include "via.h"
@@ -54,28 +53,27 @@ void via_config_set_value(uint8_t *data) {
     indi_index                            = ((int)(*value_id) - 1) / 5;
     data_index                            = (int)(*value_id) - indi_index * 5;
     indicator_config *current_indicator_p = get_indicator_p(indi_index);
-    uprintf("--> value_id: %X\n", (int)(*value_id));
 
     switch (data_index) {
         case 1: {
             current_indicator_p->enabled = value_data[0];
             if (indi_index == 0) {
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind1.enabled);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind1.enabled);
             } else if (indi_index == 1) {
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind2.enabled);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind2.enabled);
             } else if (indi_index == 2) {
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind3.enabled);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind3.enabled);
             }
             break;
         }
         case 2: {
             current_indicator_p->v = value_data[0];
             if (indi_index == 0) {
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind1.v);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind1.v);
             } else if (indi_index == 1) {
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind2.v);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind2.v);
             } else if (indi_index == 2) {
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind3.v);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind3.v);
             }
             break;
         }
@@ -83,36 +81,36 @@ void via_config_set_value(uint8_t *data) {
             current_indicator_p->h = value_data[0];
             current_indicator_p->s = value_data[1];
             if (indi_index == 0) {
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind1.h);
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind1.s);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind1.h);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind1.s);
             } else if (indi_index == 1) {
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind2.h);
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind2.s);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind2.h);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind2.s);
             } else if (indi_index == 2) {
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind3.h);
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind3.s);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind3.h);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind3.s);
             }
             break;
         }
         case 4: {
             current_indicator_p->func = (current_indicator_p->func & 0xF0) | (uint8_t)value_data[0];
             if (indi_index == 0) {
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind1.func);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind1.func);
             } else if (indi_index == 1) {
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind2.func);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind2.func);
             } else if (indi_index == 2) {
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind3.func);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind3.func);
             }
             break;
         }
         case 5: {
             current_indicator_p->func = (current_indicator_p->func & 0x0F) | ((uint8_t)value_data[0] << 4);
             if (indi_index == 0) {
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind1.func);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind1.func);
             } else if (indi_index == 1) {
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind2.func);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind2.func);
             } else if (indi_index == 2) {
-                EEPROM_KB_PARTIAL_UPDATE(eeprom_lily_config, ind3.func);
+                eeconfig_update_kb_datablock_field(eeprom_lily_config, ind3.func);
             }
             break;
         }
@@ -150,12 +148,10 @@ void via_config_get_value(uint8_t *data) {
         }
         case 4: {
             value_data[0] = current_indicator_p->func & 0x0F;
-            uprintf("--> Current func: %x, current func with bitwise or: %X\n", current_indicator_p->func, current_indicator_p->func % 0x0F);
             break;
         }
         case 5: {
             value_data[0] = (current_indicator_p->func & 0xF0) >> 4;
-            uprintf("--> Current func: %x, current func with bitwise or: %X\n", current_indicator_p->func, current_indicator_p->func % 0xF0);
             break;
         }
         default: {

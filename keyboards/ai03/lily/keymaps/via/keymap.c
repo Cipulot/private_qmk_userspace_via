@@ -1,4 +1,4 @@
-/* Copyright 2025 Cipulot & ai03 Design Studio
+/* Copyright 2026 Cipulot & ai03 Design Studio
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

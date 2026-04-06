@@ -1,4 +1,4 @@
-/* Copyright 2025 Cipulot
+/* Copyright 2026 Cipulot
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,7 +43,7 @@ void eeconfig_init_kb(void) {
     eeprom_lily_config.ind3.enabled = true;
 
     // Write default value to EEPROM now
-    eeconfig_update_kb_datablock(&eeprom_lily_config);
+    eeconfig_update_kb_datablock(&eeprom_lily_config, 0, EECONFIG_KB_DATA_SIZE);
 
     eeconfig_init_user();
 }
@@ -51,7 +51,7 @@ void eeconfig_init_kb(void) {
 // On Keyboard startup
 void keyboard_post_init_kb(void) {
     // Read custom menu variables from memory
-    eeconfig_read_kb_datablock(&eeprom_lily_config);
+    eeconfig_read_kb_datablock(&eeprom_lily_config, 0, EECONFIG_KB_DATA_SIZE);
 
     // Set the RGB LEDs range that will be used for the effects
     rgblight_set_effect_range(3, 1);
@@ -148,5 +148,5 @@ bool indicators_callback(void) {
 uint8_t *pIndicators = (uint8_t *)&eeprom_lily_config;
 
 indicator_config *get_indicator_p(int index) {
-    return (indicator_config *)(pIndicators + 6 * index);
+    return (indicator_config *)(pIndicators + index * sizeof(indicator_config));
 }
