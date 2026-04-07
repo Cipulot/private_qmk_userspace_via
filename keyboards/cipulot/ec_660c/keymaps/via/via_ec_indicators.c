@@ -69,8 +69,8 @@ enum via_enums {
     // clang-format on
 };
 
-
-int shou;
+// Indices helpers for indicator handling
+int indi_index;
 int data_index;
 
 // Handle the data received by the keyboard from the VIA menus
@@ -86,162 +86,196 @@ void via_config_set_value(uint8_t *data) {
     }
 #    endif
 
-    switch (*value_id) {
-        case id_actuation_mode: {
-            uint8_t value = value_data[0];
-            // Update only the per-key actuation_mode field in runtime and EEPROM (shared offset)
-            update_keys_field(EC_UPDATE_SHARED_OFFSET, offsetof(runtime_key_state_t, actuation_mode), 0, &value, sizeof(uint8_t));
-            eeconfig_update_kb_datablock_field(eeprom_ec_config, eeprom_key_state);
-            if (value == 0) {
-                uprintf("#########################\n");
-                uprintf("#  Actuation Mode: APC  #\n");
-                uprintf("#########################\n");
-            } else if (value == 1) {
-                uprintf("#################################\n");
-                uprintf("# Actuation Mode: Rapid Trigger #\n");
-                uprintf("#################################\n");
-            }
-            break;
-        }
-        case id_apc_actuation_threshold: {
-            uint16_t value = value_data[1] | (value_data[0] << 8);
-            update_keys_field(EC_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, apc_actuation_threshold), 0, &value, sizeof(uint16_t));
-            uprintf("APC Mode Actuation Threshold: %d\n", value);
-            break;
-        }
-        case id_apc_release_threshold: {
-            uint16_t value = value_data[1] | (value_data[0] << 8);
-            update_keys_field(EC_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, apc_release_threshold), 0, &value, sizeof(uint16_t));
-            uprintf("APC Mode Release Threshold: %d\n", value);
-            break;
-        }
-        case id_rt_initial_deadzone_offset: {
-            uint16_t value = value_data[1] | (value_data[0] << 8);
-            update_keys_field(EC_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, rt_initial_deadzone_offset), 0, &value, sizeof(uint16_t));
-            uprintf("Rapid Trigger Mode Initial Deadzone Offset: %d\n", value);
-            break;
-        }
-        case id_rt_actuation_offset: {
-            uint8_t value = value_data[0];
-            update_keys_field(EC_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, rt_actuation_offset), 0, &value, sizeof(uint8_t));
-            uprintf("Rapid Trigger Mode Actuation Offset: %d\n", value);
-            break;
-        }
-        case id_rt_release_offset: {
-            uint8_t value = value_data[0];
-            update_keys_field(EC_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, rt_release_offset), 0, &value, sizeof(uint8_t));
-            uprintf("Rapid Trigger Mode Release Offset: %d\n", value);
-            break;
-        }
-        case id_bottoming_calibration: {
-            uint8_t value = value_data[0];
-            // 0: stop calibration and save, 1: start calibration
-            if (value == 1) {
-                // Set the bottoming calibration flag to true
-                runtime_ec_config.bottoming_calibration = true;
-                clear_keyboard();
-                uprintf("###########################\n");
-                uprintf("# Calibration In Progress #\n");
-                uprintf("###########################\n");
-            } else {
-                // Set the bottoming calibration flag to false and save readings
-                runtime_ec_config.bottoming_calibration = false;
-                clear_keyboard();
-                ec_save_bottoming_calibration_reading();
-                uprintf("## Calibration Completed ##\n");
-                ec_show_calibration_data();
-            }
-            break;
-        }
-        case id_save_threshold_data: {
-            uint8_t value = value_data[0];
-            // 0: APC thresholds, 1: RT thresholds
-            ec_save_threshold_data(value);
-            break;
-        }
-        case id_noise_floor_calibration: {
-            uint8_t value = value_data[0];
-            if (value == 0) {
-                // Perform resting position calibration
-                ec_noise_floor_calibration(); // Note: resting position calibration already rescales thresholds
-                uprintf("######################################\n");
-                uprintf("# Resting Position Readings Acquired #\n");
-                uprintf("######################################\n");
+    if ((*value_id) >= id_ind1_enabled && (*value_id) <= id_ind2_func) {
+        // Handle indicator-specific values
+        uint8_t indicator_offset              = (uint8_t)(*value_id - id_ind1_enabled);
+        indi_index                            = indicator_offset / 2;
+        data_index                            = indicator_offset % 2;
+        indicator_config *current_indicator_p = get_indicator_p(indi_index);
+
+        switch (data_index) {
+            case 0: {
+                current_indicator_p->enabled = value_data[0];
+                if (indi_index == 0) {
+                    eeconfig_update_kb_datablock_field(eeprom_ec_config, ind1.enabled);
+                } else if (indi_index == 1) {
+                    eeconfig_update_kb_datablock_field(eeprom_ec_config, ind2.enabled);
+                }
                 break;
             }
-            break;
-        }
-        case id_show_calibration_data: {
-            uint8_t value = value_data[0];
-            if (value == 0) {
-                // Show Board Calibration Data
-                ec_show_calibration_data();
+            case 1: {
+                current_indicator_p->func = (current_indicator_p->func & 0xF0) | (uint8_t)value_data[0];
+                if (indi_index == 0) {
+                    eeconfig_update_kb_datablock_field(eeprom_ec_config, ind1.func);
+                } else if (indi_index == 1) {
+                    eeconfig_update_kb_datablock_field(eeprom_ec_config, ind2.func);
+                }
+                break;
             }
-            break;
-        }
-        case id_clear_bottoming_calibration_data: {
-            uint8_t value = value_data[0];
-            if (value == 0) {
-                // Clear Calibration Data Readings
-                ec_clear_bottoming_calibration_data();
+            default: {
+                // Unhandled value.
+                break;
             }
-            break;
         }
-        case id_socd_pair_1_mode:
-            socd_pair_handler(1, 0, 0, value_data[0]);
-            break;
-        case id_socd_pair_1_key_1:
-            socd_pair_handler(1, 0, 1, value_data[1] | (value_data[0] << 8));
-            break;
-        case id_socd_pair_1_key_2:
-            socd_pair_handler(1, 0, 2, value_data[1] | (value_data[0] << 8));
-            break;
-        case id_socd_pair_2_mode:
-            socd_pair_handler(1, 1, 0, value_data[0]);
-            break;
-        case id_socd_pair_2_key_1:
-            socd_pair_handler(1, 1, 1, value_data[1] | (value_data[0] << 8));
-            break;
-        case id_socd_pair_2_key_2:
-            socd_pair_handler(1, 1, 2, value_data[1] | (value_data[0] << 8));
-            break;
-        case id_socd_pair_3_mode:
-            socd_pair_handler(1, 2, 0, value_data[0]);
-            break;
-        case id_socd_pair_3_key_1:
-            socd_pair_handler(1, 2, 1, value_data[1] | (value_data[0] << 8));
-            break;
-        case id_socd_pair_3_key_2:
-            socd_pair_handler(1, 2, 2, value_data[1] | (value_data[0] << 8));
-            break;
-        case id_socd_pair_4_mode:
-            socd_pair_handler(1, 3, 0, value_data[0]);
-            break;
-        case id_socd_pair_4_key_1:
-            socd_pair_handler(1, 3, 1, value_data[1] | (value_data[0] << 8));
-            break;
-        case id_socd_pair_4_key_2:
-            socd_pair_handler(1, 3, 2, value_data[1] | (value_data[0] << 8));
-            break;
-        case id_flash_mode: {
-            uint8_t value = value_data[0];
-            if (value == 0) {
-                // Execute DFU Jump
-                reset_keyboard();
+        indicators_callback();
+    } else {
+        switch (*value_id) {
+            case id_actuation_mode: {
+                uint8_t value = value_data[0];
+                // Update only the per-key actuation_mode field in runtime and EEPROM (shared offset)
+                update_keys_field(EC_UPDATE_SHARED_OFFSET, offsetof(runtime_key_state_t, actuation_mode), 0, &value, sizeof(uint8_t));
+                eeconfig_update_kb_datablock_field(eeprom_ec_config, eeprom_key_state);
+                if (value == 0) {
+                    uprintf("#########################\n");
+                    uprintf("#  Actuation Mode: APC  #\n");
+                    uprintf("#########################\n");
+                } else if (value == 1) {
+                    uprintf("#################################\n");
+                    uprintf("# Actuation Mode: Rapid Trigger #\n");
+                    uprintf("#################################\n");
+                }
+                break;
             }
-            break;
-        }
-        case id_factory_reset: {
-            uint8_t value = value_data[0];
-            if (value == 0) {
-                // Factory reset the board to the original state
-                factory_reset();
+            case id_apc_actuation_threshold: {
+                uint16_t value = value_data[1] | (value_data[0] << 8);
+                update_keys_field(EC_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, apc_actuation_threshold), 0, &value, sizeof(uint16_t));
+                uprintf("APC Mode Actuation Threshold: %d\n", value);
+                break;
             }
-            break;
-        }
-        default: {
-            // Unhandled value.
-            break;
+            case id_apc_release_threshold: {
+                uint16_t value = value_data[1] | (value_data[0] << 8);
+                update_keys_field(EC_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, apc_release_threshold), 0, &value, sizeof(uint16_t));
+                uprintf("APC Mode Release Threshold: %d\n", value);
+                break;
+            }
+            case id_rt_initial_deadzone_offset: {
+                uint16_t value = value_data[1] | (value_data[0] << 8);
+                update_keys_field(EC_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, rt_initial_deadzone_offset), 0, &value, sizeof(uint16_t));
+                uprintf("Rapid Trigger Mode Initial Deadzone Offset: %d\n", value);
+                break;
+            }
+            case id_rt_actuation_offset: {
+                uint8_t value = value_data[0];
+                update_keys_field(EC_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, rt_actuation_offset), 0, &value, sizeof(uint8_t));
+                uprintf("Rapid Trigger Mode Actuation Offset: %d\n", value);
+                break;
+            }
+            case id_rt_release_offset: {
+                uint8_t value = value_data[0];
+                update_keys_field(EC_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, rt_release_offset), 0, &value, sizeof(uint8_t));
+                uprintf("Rapid Trigger Mode Release Offset: %d\n", value);
+                break;
+            }
+            case id_bottoming_calibration: {
+                uint8_t value = value_data[0];
+                // 0: stop calibration and save, 1: start calibration
+                if (value == 1) {
+                    // Set the bottoming calibration flag to true
+                    runtime_ec_config.bottoming_calibration = true;
+                    clear_keyboard();
+                    uprintf("###########################\n");
+                    uprintf("# Calibration In Progress #\n");
+                    uprintf("###########################\n");
+                } else {
+                    // Set the bottoming calibration flag to false and save readings
+                    runtime_ec_config.bottoming_calibration = false;
+                    clear_keyboard();
+                    ec_save_bottoming_calibration_reading();
+                    uprintf("## Calibration Completed ##\n");
+                    ec_show_calibration_data();
+                }
+                break;
+            }
+            case id_save_threshold_data: {
+                uint8_t value = value_data[0];
+                // 0: APC thresholds, 1: RT thresholds
+                ec_save_threshold_data(value);
+                break;
+            }
+            case id_noise_floor_calibration: {
+                uint8_t value = value_data[0];
+                if (value == 0) {
+                    // Perform resting position calibration
+                    ec_noise_floor_calibration(); // Note: resting position calibration already rescales thresholds
+                    uprintf("######################################\n");
+                    uprintf("# Resting Position Readings Acquired #\n");
+                    uprintf("######################################\n");
+                    break;
+                }
+                break;
+            }
+            case id_show_calibration_data: {
+                uint8_t value = value_data[0];
+                if (value == 0) {
+                    // Show Board Calibration Data
+                    ec_show_calibration_data();
+                }
+                break;
+            }
+            case id_clear_bottoming_calibration_data: {
+                uint8_t value = value_data[0];
+                if (value == 0) {
+                    // Clear Calibration Data Readings
+                    ec_clear_bottoming_calibration_data();
+                }
+                break;
+            }
+            case id_socd_pair_1_mode:
+                socd_pair_handler(1, 0, 0, value_data[0]);
+                break;
+            case id_socd_pair_1_key_1:
+                socd_pair_handler(1, 0, 1, value_data[1] | (value_data[0] << 8));
+                break;
+            case id_socd_pair_1_key_2:
+                socd_pair_handler(1, 0, 2, value_data[1] | (value_data[0] << 8));
+                break;
+            case id_socd_pair_2_mode:
+                socd_pair_handler(1, 1, 0, value_data[0]);
+                break;
+            case id_socd_pair_2_key_1:
+                socd_pair_handler(1, 1, 1, value_data[1] | (value_data[0] << 8));
+                break;
+            case id_socd_pair_2_key_2:
+                socd_pair_handler(1, 1, 2, value_data[1] | (value_data[0] << 8));
+                break;
+            case id_socd_pair_3_mode:
+                socd_pair_handler(1, 2, 0, value_data[0]);
+                break;
+            case id_socd_pair_3_key_1:
+                socd_pair_handler(1, 2, 1, value_data[1] | (value_data[0] << 8));
+                break;
+            case id_socd_pair_3_key_2:
+                socd_pair_handler(1, 2, 2, value_data[1] | (value_data[0] << 8));
+                break;
+            case id_socd_pair_4_mode:
+                socd_pair_handler(1, 3, 0, value_data[0]);
+                break;
+            case id_socd_pair_4_key_1:
+                socd_pair_handler(1, 3, 1, value_data[1] | (value_data[0] << 8));
+                break;
+            case id_socd_pair_4_key_2:
+                socd_pair_handler(1, 3, 2, value_data[1] | (value_data[0] << 8));
+                break;
+            case id_flash_mode: {
+                uint8_t value = value_data[0];
+                if (value == 0) {
+                    // Execute DFU Jump
+                    reset_keyboard();
+                }
+                break;
+            }
+            case id_factory_reset: {
+                uint8_t value = value_data[0];
+                if (value == 0) {
+                    // Factory reset the board to the original state
+                    factory_reset();
+                }
+                break;
+            }
+            default: {
+                // Unhandled value.
+                break;
+            }
         }
     }
 }
@@ -256,89 +290,112 @@ void via_config_get_value(uint8_t *data) {
     // Hardcoded to [0][0] as for now every key has the same config
     runtime_key_state_t *key_runtime = &runtime_ec_config.runtime_key_state[0][0];
 
-    switch (*value_id) {
-        case id_actuation_mode: {
-            value_data[0] = key_runtime->actuation_mode;
-            break;
+    if ((*value_id) >= id_ind1_enabled && (*value_id) <= id_ind2_func) {
+        // Handle indicator-specific values
+        uint8_t indicator_offset              = (uint8_t)(*value_id - id_ind1_enabled);
+        indi_index                            = indicator_offset / 2;
+        data_index                            = indicator_offset % 2;
+        indicator_config *current_indicator_p = get_indicator_p(indi_index);
+
+        switch (data_index) {
+            case 0: {
+                value_data[0] = current_indicator_p->enabled;
+                break;
+            }
+            case 1: {
+                value_data[0] = current_indicator_p->func & 0x0F;
+                break;
+            }
+            default: {
+                // Unhandled value.
+                break;
+            }
         }
-        case id_apc_actuation_threshold: {
-            value_data[0] = key_runtime->apc_actuation_threshold >> 8;
-            value_data[1] = key_runtime->apc_actuation_threshold & 0xFF;
-            break;
-        }
-        case id_apc_release_threshold: {
-            value_data[0] = key_runtime->apc_release_threshold >> 8;
-            value_data[1] = key_runtime->apc_release_threshold & 0xFF;
-            break;
-        }
-        case id_rt_initial_deadzone_offset: {
-            value_data[0] = key_runtime->rt_initial_deadzone_offset >> 8;
-            value_data[1] = key_runtime->rt_initial_deadzone_offset & 0xFF;
-            break;
-        }
-        case id_rt_actuation_offset: {
-            value_data[0] = key_runtime->rt_actuation_offset;
-            break;
-        }
-        case id_rt_release_offset: {
-            value_data[0] = key_runtime->rt_release_offset;
-            break;
-        }
-        case id_socd_pair_1_mode:
-            value_data[0] = socd_pair_handler(0, 0, 0, 0);
-            break;
-        case id_socd_pair_1_key_1:
-            socd_pair_result = socd_pair_handler(0, 0, 1, 0);
-            value_data[0]    = socd_pair_result >> 8;
-            value_data[1]    = socd_pair_result & 0xFF;
-            break;
-        case id_socd_pair_1_key_2:
-            socd_pair_result = socd_pair_handler(0, 0, 2, 0);
-            value_data[0]    = socd_pair_result >> 8;
-            value_data[1]    = socd_pair_result & 0xFF;
-            break;
-        case id_socd_pair_2_mode:
-            value_data[0] = socd_pair_handler(0, 1, 0, 0);
-            break;
-        case id_socd_pair_2_key_1:
-            socd_pair_result = socd_pair_handler(0, 1, 1, 0);
-            value_data[0]    = socd_pair_result >> 8;
-            value_data[1]    = socd_pair_result & 0xFF;
-            break;
-        case id_socd_pair_2_key_2:
-            socd_pair_result = socd_pair_handler(0, 1, 2, 0);
-            value_data[0]    = socd_pair_result >> 8;
-            value_data[1]    = socd_pair_result & 0xFF;
-            break;
-        case id_socd_pair_3_mode:
-            value_data[0] = socd_pair_handler(0, 2, 0, 0);
-            break;
-        case id_socd_pair_3_key_1:
-            socd_pair_result = socd_pair_handler(0, 2, 1, 0);
-            value_data[0]    = socd_pair_result >> 8;
-            value_data[1]    = socd_pair_result & 0xFF;
-            break;
-        case id_socd_pair_3_key_2:
-            socd_pair_result = socd_pair_handler(0, 2, 2, 0);
-            value_data[0]    = socd_pair_result >> 8;
-            value_data[1]    = socd_pair_result & 0xFF;
-            break;
-        case id_socd_pair_4_mode:
-            value_data[0] = socd_pair_handler(0, 3, 0, 0);
-            break;
-        case id_socd_pair_4_key_1:
-            socd_pair_result = socd_pair_handler(0, 3, 1, 0);
-            value_data[0]    = socd_pair_result >> 8;
-            value_data[1]    = socd_pair_result & 0xFF;
-            break;
-        case id_socd_pair_4_key_2:
-            socd_pair_result = socd_pair_handler(0, 3, 2, 0);
-            value_data[0]    = socd_pair_result >> 8;
-            value_data[1]    = socd_pair_result & 0xFF;
-            break;
-        default: {
-            // Unhandled value.
-            break;
+    } else {
+        switch (*value_id) {
+            case id_actuation_mode: {
+                value_data[0] = key_runtime->actuation_mode;
+                break;
+            }
+            case id_apc_actuation_threshold: {
+                value_data[0] = key_runtime->apc_actuation_threshold >> 8;
+                value_data[1] = key_runtime->apc_actuation_threshold & 0xFF;
+                break;
+            }
+            case id_apc_release_threshold: {
+                value_data[0] = key_runtime->apc_release_threshold >> 8;
+                value_data[1] = key_runtime->apc_release_threshold & 0xFF;
+                break;
+            }
+            case id_rt_initial_deadzone_offset: {
+                value_data[0] = key_runtime->rt_initial_deadzone_offset >> 8;
+                value_data[1] = key_runtime->rt_initial_deadzone_offset & 0xFF;
+                break;
+            }
+            case id_rt_actuation_offset: {
+                value_data[0] = key_runtime->rt_actuation_offset;
+                break;
+            }
+            case id_rt_release_offset: {
+                value_data[0] = key_runtime->rt_release_offset;
+                break;
+            }
+            case id_socd_pair_1_mode:
+                value_data[0] = socd_pair_handler(0, 0, 0, 0);
+                break;
+            case id_socd_pair_1_key_1:
+                socd_pair_result = socd_pair_handler(0, 0, 1, 0);
+                value_data[0]    = socd_pair_result >> 8;
+                value_data[1]    = socd_pair_result & 0xFF;
+                break;
+            case id_socd_pair_1_key_2:
+                socd_pair_result = socd_pair_handler(0, 0, 2, 0);
+                value_data[0]    = socd_pair_result >> 8;
+                value_data[1]    = socd_pair_result & 0xFF;
+                break;
+            case id_socd_pair_2_mode:
+                value_data[0] = socd_pair_handler(0, 1, 0, 0);
+                break;
+            case id_socd_pair_2_key_1:
+                socd_pair_result = socd_pair_handler(0, 1, 1, 0);
+                value_data[0]    = socd_pair_result >> 8;
+                value_data[1]    = socd_pair_result & 0xFF;
+                break;
+            case id_socd_pair_2_key_2:
+                socd_pair_result = socd_pair_handler(0, 1, 2, 0);
+                value_data[0]    = socd_pair_result >> 8;
+                value_data[1]    = socd_pair_result & 0xFF;
+                break;
+            case id_socd_pair_3_mode:
+                value_data[0] = socd_pair_handler(0, 2, 0, 0);
+                break;
+            case id_socd_pair_3_key_1:
+                socd_pair_result = socd_pair_handler(0, 2, 1, 0);
+                value_data[0]    = socd_pair_result >> 8;
+                value_data[1]    = socd_pair_result & 0xFF;
+                break;
+            case id_socd_pair_3_key_2:
+                socd_pair_result = socd_pair_handler(0, 2, 2, 0);
+                value_data[0]    = socd_pair_result >> 8;
+                value_data[1]    = socd_pair_result & 0xFF;
+                break;
+            case id_socd_pair_4_mode:
+                value_data[0] = socd_pair_handler(0, 3, 0, 0);
+                break;
+            case id_socd_pair_4_key_1:
+                socd_pair_result = socd_pair_handler(0, 3, 1, 0);
+                value_data[0]    = socd_pair_result >> 8;
+                value_data[1]    = socd_pair_result & 0xFF;
+                break;
+            case id_socd_pair_4_key_2:
+                socd_pair_result = socd_pair_handler(0, 3, 2, 0);
+                value_data[0]    = socd_pair_result >> 8;
+                value_data[1]    = socd_pair_result & 0xFF;
+                break;
+            default: {
+                // Unhandled value.
+                break;
+            }
         }
     }
 }
