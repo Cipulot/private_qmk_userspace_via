@@ -158,6 +158,8 @@ enum via_enums {
     id_socd_pair_4_key_1 = 107,
     id_socd_pair_4_key_2 = 108,
     id_board_mode = 109,
+    id_flash_mode = 110,
+    id_factory_reset = 111,
     // clang-format on
 };
 
@@ -523,6 +525,22 @@ void via_config_set_value(uint8_t *data) {
             case id_socd_pair_4_key_2:
                 socd_pair_handler(1, 3, 2, value_data[1] | (value_data[0] << 8));
                 break;
+            case id_flash_mode: {
+                uint8_t value = value_data[0];
+                if (value == 0) {
+                    // Execute DFU Jump
+                    reset_keyboard();
+                }
+                break;
+            }
+            case id_factory_reset: {
+                uint8_t value = value_data[0];
+                if (value == 0) {
+                    // Factory reset the board to the original state
+                    factory_reset();
+                }
+                break;
+            }
             default: {
                 // Unhandled value.
                 break;
@@ -912,17 +930,30 @@ static void hybrid_show_calibration_data(void) {
     print("\n\n\n");
 }
 
-// Clear the calibration data
+// Clear the calibration data readings
 static void hybrid_clear_bottoming_calibration_data(void) {
-    // Clear the EEPROM data
-    eeconfig_init_kb();
+    // Clear the EEPROM Calibration Data Readings only
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            // Get pointer to key state in runtime and EEPROM
+            runtime_key_state_t *key_runtime = &runtime_hybrid_config.runtime_key_state[row][col];
+            eeprom_key_state_t  *key_eeprom  = &eeprom_hybrid_config.eeprom_key_state[row][col];
 
-    // Reset the runtime values to the EEPROM values
-    keyboard_post_init_kb();
+            // Default the runtime and eeprom values to the default bottoming value
+            key_runtime->bottoming_calibration_reading = DEFAULT_BOTTOMING_CALIBRATION_READING;
+            key_runtime->bottoming_calibration_starter = DEFAULT_CALIBRATION_STARTER;
+            key_eeprom->bottoming_calibration_reading  = DEFAULT_BOTTOMING_CALIBRATION_READING;
 
-    uprintf("######################################\n");
+            // Rescale thresholds based on default bottoming value
+            bulk_rescale_key_thresholds(key_runtime, key_eeprom, RESCALE_MODE_ALL);
+        }
+    }
+    // Save to EEPROM the eeprom_key_state field
+    eeconfig_update_kb_datablock_field(eeprom_hybrid_config, eeprom_key_state);
+
+    uprintf("############################\n");
     uprintf("# Calibration Data Cleared #\n");
-    uprintf("######################################\n");
+    uprintf("############################\n");
 }
 
 // Handle the SOCD pairs configuration
@@ -971,6 +1002,20 @@ static uint16_t socd_pair_handler(bool mode, uint8_t pair_idx, uint8_t field, ui
                 return 0;
         }
     }
+}
+
+// Factory reset the board (unplug/replug requirement is merely a way to have UI refresh from a new connection)
+static void factory_reset(void) {
+    // Clear the EEPROM data
+    eeconfig_init_kb();
+
+    // Reset the runtime values to the EEPROM values
+    keyboard_post_init_kb();
+
+    uprintf("###################################################################\n");
+    uprintf("# Factory Reset Performed                                         #\n");
+    uprintf("# Unplug the board and plug it back in to complete the procedure. #\n");
+    uprintf("###################################################################\n");
 }
 
 // Slave handler for split keyboards
