@@ -31,6 +31,7 @@ static void     hybrid_save_threshold_data(uint8_t option);
 static void     hybrid_save_bottoming_calibration_reading(void);
 static void     hybrid_show_calibration_data(void);
 static void     hybrid_clear_bottoming_calibration_data(void);
+static void     factory_reset(void);
 static uint16_t socd_pair_handler(bool mode, uint8_t pair_idx, uint8_t field, uint16_t value);
 
 // Declaring enums for VIA config menu
