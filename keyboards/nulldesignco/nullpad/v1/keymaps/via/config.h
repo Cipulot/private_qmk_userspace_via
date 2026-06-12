@@ -1,0 +1,2 @@
+#define COMBO_TERM 300
+#define COMBO_MUST_PRESS_IN_ORDER
