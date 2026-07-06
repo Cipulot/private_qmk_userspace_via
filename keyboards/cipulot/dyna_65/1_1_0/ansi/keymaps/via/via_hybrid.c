@@ -18,6 +18,7 @@
 #include "print.h"
 #include "via.h"
 #include <string.h>
+#include "generated_calibration_layout.h"
 
 #ifdef SPLIT_KEYBOARD
 #    include "transactions.h"
@@ -32,6 +33,121 @@ static void     hybrid_save_bottoming_calibration_reading(void);
 static void     hybrid_show_calibration_data(void);
 static void     hybrid_clear_bottoming_calibration_data(void);
 static uint16_t socd_pair_handler(bool mode, uint8_t pair_idx, uint8_t field, uint16_t value);
+
+
+typedef enum {
+    CAL_PRINT_SWITCH_TYPE,
+    CAL_PRINT_ACTUATION_MODE,
+    CAL_PRINT_APC_ACTUATION,
+    CAL_PRINT_APC_RELEASE,
+    CAL_PRINT_RT_INITIAL_DEADZONE,
+    CAL_PRINT_RT_ACTUATION,
+    CAL_PRINT_RT_RELEASE,
+    CAL_PRINT_NOISE_FLOOR,
+    CAL_PRINT_EXTREMUM,
+    CAL_PRINT_BOTTOMING,
+} calibration_print_field_t;
+
+static uint16_t calibration_get_print_value(calibration_print_field_t field, uint8_t row, uint8_t col) {
+    runtime_key_state_t *key_runtime = &runtime_hybrid_config.runtime_key_state[row][col];
+    eeprom_key_state_t  *key_eeprom  = &eeprom_hybrid_config.eeprom_key_state[row][col];
+
+    switch (field) {
+        case CAL_PRINT_SWITCH_TYPE:
+            return key_eeprom->switch_type;
+        case CAL_PRINT_ACTUATION_MODE:
+            return key_eeprom->actuation_mode;
+        case CAL_PRINT_APC_ACTUATION:
+            return key_runtime->rescaled_apc_actuation_threshold;
+        case CAL_PRINT_APC_RELEASE:
+            return key_runtime->rescaled_apc_release_threshold;
+        case CAL_PRINT_RT_INITIAL_DEADZONE:
+            return key_runtime->rescaled_rt_initial_deadzone_offset;
+        case CAL_PRINT_RT_ACTUATION:
+            return key_runtime->rescaled_rt_actuation_offset;
+        case CAL_PRINT_RT_RELEASE:
+            return key_runtime->rescaled_rt_release_offset;
+        case CAL_PRINT_NOISE_FLOOR:
+            return key_runtime->noise_floor;
+        case CAL_PRINT_EXTREMUM:
+            return key_runtime->extremum;
+        case CAL_PRINT_BOTTOMING:
+            return key_runtime->bottoming_calibration_reading;
+        default:
+            return 0;
+    }
+}
+
+static void calibration_print_spaces(uint8_t count) {
+    for (uint8_t i = 0; i < count; i++) {
+        uprintf(" ");
+    }
+}
+
+static void calibration_print_dashes(uint8_t count) {
+    for (uint8_t i = 0; i < count; i++) {
+        uprintf("-");
+    }
+}
+
+static void calibration_print_to_x(uint8_t *cursor, uint8_t x) {
+    while (*cursor < x) {
+        uprintf(" ");
+        (*cursor)++;
+    }
+}
+
+static void calibration_print_key_border_row(uint8_t layout_row) {
+    uint8_t cursor = 0;
+
+    for (uint8_t idx = 0; idx < ARRAY_SIZE(calibration_print_layout[layout_row]); idx++) {
+        calibration_layout_key_t key = calibration_print_layout[layout_row][idx];
+
+        if (key.row == CALIBRATION_LAYOUT_END) {
+            break;
+        }
+
+        calibration_print_to_x(&cursor, key.x);
+        uprintf("+");
+        calibration_print_dashes(key.w - 2);
+        uprintf("+");
+        cursor = key.x + key.w;
+    }
+    uprintf("\n");
+}
+
+static void calibration_print_key_value_row(calibration_print_field_t field, uint8_t layout_row) {
+    uint8_t cursor = 0;
+
+    for (uint8_t idx = 0; idx < ARRAY_SIZE(calibration_print_layout[layout_row]); idx++) {
+        calibration_layout_key_t key = calibration_print_layout[layout_row][idx];
+
+        if (key.row == CALIBRATION_LAYOUT_END) {
+            break;
+        }
+
+        uint8_t inner_width  = key.w - 2;
+        uint8_t left_spaces  = (inner_width - 4) / 2;
+        uint8_t right_spaces = inner_width - 4 - left_spaces;
+
+        calibration_print_to_x(&cursor, key.x);
+        uprintf("|");
+        calibration_print_spaces(left_spaces);
+        uprintf("%4d", calibration_get_print_value(field, key.row, key.col));
+        calibration_print_spaces(right_spaces);
+        uprintf("|");
+        cursor = key.x + key.w;
+    }
+    uprintf("\n");
+}
+
+static void calibration_print_layout_field(calibration_print_field_t field) {
+    for (uint8_t layout_row = 0; layout_row < ARRAY_SIZE(calibration_print_layout); layout_row++) {
+        calibration_print_key_border_row(layout_row);
+        calibration_print_key_value_row(field, layout_row);
+        calibration_print_key_border_row(layout_row);
+    }
+}
 
 // Declaring enums for VIA config menu
 enum via_enums {
@@ -446,102 +562,57 @@ static void hybrid_show_calibration_data(void) {
     uprintf("\n##################\n");
     uprintf("# Actuation Mode #\n");
     uprintf("##################\n");
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS - 1; col++) {
-            uprintf("%4d,", eeprom_hybrid_config.eeprom_key_state[row][col].actuation_mode);
-        }
-        uprintf("%4d\n", eeprom_hybrid_config.eeprom_key_state[row][MATRIX_COLS - 1].actuation_mode);
-    }
+    calibration_print_layout_field(CAL_PRINT_ACTUATION_MODE);
 
     uprintf("\n###############\n");
     uprintf("# Resting Position Readings #\n");
     uprintf("###############\n");
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS - 1; col++) {
-            uprintf("%4d,", runtime_hybrid_config.runtime_key_state[row][col].noise_floor);
-        }
-        uprintf("%4d\n", runtime_hybrid_config.runtime_key_state[row][MATRIX_COLS - 1].noise_floor);
-    }
+    calibration_print_layout_field(CAL_PRINT_NOISE_FLOOR);
 
     uprintf("\n############\n");
     uprintf("# Extremum #\n");
     uprintf("############\n");
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS - 1; col++) {
-            uprintf("%4d,", runtime_hybrid_config.runtime_key_state[row][col].extremum);
-        }
-        uprintf("%4d\n", runtime_hybrid_config.runtime_key_state[row][MATRIX_COLS - 1].extremum);
-    }
+    calibration_print_layout_field(CAL_PRINT_EXTREMUM);
 
     uprintf("\n######################\n");
     uprintf("# Calibration Readings #\n");
     uprintf("######################\n");
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS - 1; col++) {
-            uprintf("%4d,", runtime_hybrid_config.runtime_key_state[row][col].bottoming_calibration_reading);
-        }
-        uprintf("%4d\n", runtime_hybrid_config.runtime_key_state[row][MATRIX_COLS - 1].bottoming_calibration_reading);
-    }
+    calibration_print_layout_field(CAL_PRINT_BOTTOMING);
 
     uprintf("\n######################################\n");
     uprintf("# APC Mode Actuation Threshold       #\n");
     uprintf("######################################\n");
     uprintf("Original Value: %4d\n", eeprom_hybrid_config.eeprom_key_state[0][0].apc_actuation_threshold);
     uprintf("Rescaled Values:\n");
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS - 1; col++) {
-            uprintf("%4d,", runtime_hybrid_config.runtime_key_state[row][col].rescaled_apc_actuation_threshold);
-        }
-        uprintf("%4d\n", runtime_hybrid_config.runtime_key_state[row][MATRIX_COLS - 1].rescaled_apc_actuation_threshold);
-    }
+    calibration_print_layout_field(CAL_PRINT_APC_ACTUATION);
 
     uprintf("\n######################################\n");
     uprintf("# APC Mode Release Threshold         #\n");
     uprintf("######################################\n");
     uprintf("Original Value: %4d\n", eeprom_hybrid_config.eeprom_key_state[0][0].apc_release_threshold);
     uprintf("Rescaled Values:\n");
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS - 1; col++) {
-            uprintf("%4d,", runtime_hybrid_config.runtime_key_state[row][col].rescaled_apc_release_threshold);
-        }
-        uprintf("%4d\n", runtime_hybrid_config.runtime_key_state[row][MATRIX_COLS - 1].rescaled_apc_release_threshold);
-    }
+    calibration_print_layout_field(CAL_PRINT_APC_RELEASE);
 
     uprintf("\n#######################################################\n");
     uprintf("# Rapid Trigger Mode Initial Deadzone Offset          #\n");
     uprintf("#######################################################\n");
     uprintf("Original Value: %4d\n", eeprom_hybrid_config.eeprom_key_state[0][0].rt_initial_deadzone_offset);
     uprintf("Rescaled Values:\n");
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS - 1; col++) {
-            uprintf("%4d,", runtime_hybrid_config.runtime_key_state[row][col].rescaled_rt_initial_deadzone_offset);
-        }
-        uprintf("%4d\n", runtime_hybrid_config.runtime_key_state[row][MATRIX_COLS - 1].rescaled_rt_initial_deadzone_offset);
-    }
+    calibration_print_layout_field(CAL_PRINT_RT_INITIAL_DEADZONE);
 
     uprintf("\n#######################################################\n");
     uprintf("# Rapid Trigger Mode Actuation Offset                 #\n");
     uprintf("#######################################################\n");
     uprintf("Original Value: %4d\n", eeprom_hybrid_config.eeprom_key_state[0][0].rt_actuation_offset);
     uprintf("Rescaled Values:\n");
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS - 1; col++) {
-            uprintf("%4d,", runtime_hybrid_config.runtime_key_state[row][col].rescaled_rt_actuation_offset);
-        }
-        uprintf("%4d\n", runtime_hybrid_config.runtime_key_state[row][MATRIX_COLS - 1].rescaled_rt_actuation_offset);
-    }
+    calibration_print_layout_field(CAL_PRINT_RT_ACTUATION);
 
     uprintf("\n#######################################################\n");
     uprintf("# Rapid Trigger Mode Release Offset                   #\n");
     uprintf("#######################################################\n");
     uprintf("Original Value: %4d\n", eeprom_hybrid_config.eeprom_key_state[0][0].rt_release_offset);
     uprintf("Rescaled Values:\n");
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS - 1; col++) {
-            uprintf("%4d,", runtime_hybrid_config.runtime_key_state[row][col].rescaled_rt_release_offset);
-        }
-        uprintf("%4d\n", runtime_hybrid_config.runtime_key_state[row][MATRIX_COLS - 1].rescaled_rt_release_offset);
-    }
+    calibration_print_layout_field(CAL_PRINT_RT_RELEASE);
     print("\n");
 }
 

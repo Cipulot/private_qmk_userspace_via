@@ -15,6 +15,7 @@
  */
 
 #include "ec_switch_matrix.h"
+#include "generated_calibration_layout.h"
 #include "action.h"
 #include "print.h"
 #include "via.h"
@@ -30,6 +31,108 @@ void ec_save_threshold_data(uint8_t option);
 void ec_save_bottoming_reading(void);
 void ec_show_calibration_data(void);
 void ec_clear_bottoming_calibration_data(void);
+
+
+typedef enum {
+    CAL_PRINT_SWITCH_TYPE,
+    CAL_PRINT_ACTUATION_MODE,
+    CAL_PRINT_APC_ACTUATION,
+    CAL_PRINT_APC_RELEASE,
+    CAL_PRINT_RT_INITIAL_DEADZONE,
+    CAL_PRINT_RT_ACTUATION,
+    CAL_PRINT_RT_RELEASE,
+    CAL_PRINT_NOISE_FLOOR,
+    CAL_PRINT_EXTREMUM,
+    CAL_PRINT_BOTTOMING,
+} calibration_print_field_t;
+
+static uint16_t calibration_get_print_value(calibration_print_field_t field, uint8_t row, uint8_t col) {
+    switch (field) {
+        case CAL_PRINT_APC_ACTUATION:
+            return ec_config.rescaled_mode_0_actuation_threshold[row][col];
+        case CAL_PRINT_APC_RELEASE:
+            return ec_config.rescaled_mode_0_release_threshold[row][col];
+        case CAL_PRINT_RT_INITIAL_DEADZONE:
+            return ec_config.rescaled_mode_1_initial_deadzone_offset[row][col];
+        case CAL_PRINT_NOISE_FLOOR:
+            return ec_config.noise_floor[row][col];
+        case CAL_PRINT_BOTTOMING:
+            return eeprom_ec_config.bottoming_reading[row][col];
+        default:
+            return 0;
+    }
+}
+
+static void calibration_print_spaces(uint8_t count) {
+    for (uint8_t i = 0; i < count; i++) {
+        uprintf(" ");
+    }
+}
+
+static void calibration_print_dashes(uint8_t count) {
+    for (uint8_t i = 0; i < count; i++) {
+        uprintf("-");
+    }
+}
+
+static void calibration_print_to_x(uint8_t *cursor, uint8_t x) {
+    while (*cursor < x) {
+        uprintf(" ");
+        (*cursor)++;
+    }
+}
+
+static void calibration_print_key_border_row(uint8_t layout_row) {
+    uint8_t cursor = 0;
+
+    for (uint8_t idx = 0; idx < ARRAY_SIZE(calibration_print_layout[layout_row]); idx++) {
+        calibration_layout_key_t key = calibration_print_layout[layout_row][idx];
+
+        if (key.row == CALIBRATION_LAYOUT_END) {
+            break;
+        }
+
+        calibration_print_to_x(&cursor, key.x);
+        uprintf("+");
+        calibration_print_dashes(key.w - 2);
+        uprintf("+");
+        cursor = key.x + key.w;
+    }
+    uprintf("\n");
+}
+
+static void calibration_print_key_value_row(calibration_print_field_t field, uint8_t layout_row) {
+    uint8_t cursor = 0;
+
+    for (uint8_t idx = 0; idx < ARRAY_SIZE(calibration_print_layout[layout_row]); idx++) {
+        calibration_layout_key_t key = calibration_print_layout[layout_row][idx];
+
+        if (key.row == CALIBRATION_LAYOUT_END) {
+            break;
+        }
+
+        uint8_t inner_width  = key.w - 2;
+        uint8_t left_spaces  = (inner_width - 4) / 2;
+        uint8_t right_spaces = inner_width - 4 - left_spaces;
+
+        calibration_print_to_x(&cursor, key.x);
+        uprintf("|");
+        calibration_print_spaces(left_spaces);
+        uprintf("%4d", calibration_get_print_value(field, key.row, key.col));
+        calibration_print_spaces(right_spaces);
+        uprintf("|");
+        cursor = key.x + key.w;
+    }
+    uprintf("\n");
+}
+
+static void calibration_print_layout_field(calibration_print_field_t field) {
+    for (uint8_t layout_row = 0; layout_row < ARRAY_SIZE(calibration_print_layout); layout_row++) {
+        calibration_print_key_border_row(layout_row);
+        calibration_print_key_value_row(field, layout_row);
+        calibration_print_key_border_row(layout_row);
+    }
+}
 
 // Declaring enums for VIA config menu
 enum via_enums {
@@ -329,55 +432,30 @@ void ec_show_calibration_data(void) {
     uprintf("\n###############\n");
     uprintf("# Resting Position Readings #\n");
     uprintf("###############\n");
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS - 1; col++) {
-            uprintf("%4d,", ec_config.noise_floor[row][col]);
-        }
-        uprintf("%4d\n", ec_config.noise_floor[row][MATRIX_COLS - 1]);
-    }
+    calibration_print_layout_field(CAL_PRINT_NOISE_FLOOR);
 
     uprintf("\n######################\n");
     uprintf("# Calibration Readings #\n");
     uprintf("######################\n");
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS - 1; col++) {
-            uprintf("%4d,", eeprom_ec_config.bottoming_reading[row][col]);
-        }
-        uprintf("%4d\n", eeprom_ec_config.bottoming_reading[row][MATRIX_COLS - 1]);
-    }
+    calibration_print_layout_field(CAL_PRINT_BOTTOMING);
 
     uprintf("\n######################################\n");
     uprintf("# Rescaled APC Mode Actuation Points #\n");
     uprintf("######################################\n");
     uprintf("Original APC Mode Actuation Point: %4d\n", ec_config.mode_0_actuation_threshold);
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS - 1; col++) {
-            uprintf("%4d,", ec_config.rescaled_mode_0_actuation_threshold[row][col]);
-        }
-        uprintf("%4d\n", ec_config.rescaled_mode_0_actuation_threshold[row][MATRIX_COLS - 1]);
-    }
+    calibration_print_layout_field(CAL_PRINT_APC_ACTUATION);
 
     uprintf("\n######################################\n");
     uprintf("# Rescaled APC Mode Release Points   #\n");
     uprintf("######################################\n");
     uprintf("Original APC Mode Release Point: %4d\n", ec_config.mode_0_release_threshold);
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS - 1; col++) {
-            uprintf("%4d,", ec_config.rescaled_mode_0_release_threshold[row][col]);
-        }
-        uprintf("%4d\n", ec_config.rescaled_mode_0_release_threshold[row][MATRIX_COLS - 1]);
-    }
+    calibration_print_layout_field(CAL_PRINT_APC_RELEASE);
 
     uprintf("\n#######################################################\n");
     uprintf("# Rescaled Rapid Trigger Mode Initial Deadzone Offset #\n");
     uprintf("#######################################################\n");
     uprintf("Original Rapid Trigger Mode Initial Deadzone Offset: %4d\n", ec_config.mode_1_initial_deadzone_offset);
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS - 1; col++) {
-            uprintf("%4d,", ec_config.rescaled_mode_1_initial_deadzone_offset[row][col]);
-        }
-        uprintf("%4d\n", ec_config.rescaled_mode_1_initial_deadzone_offset[row][MATRIX_COLS - 1]);
-    }
+    calibration_print_layout_field(CAL_PRINT_RT_INITIAL_DEADZONE);
     print("\n");
 }
 
