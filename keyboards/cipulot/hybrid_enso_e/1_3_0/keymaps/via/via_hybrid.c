@@ -404,17 +404,10 @@ void via_config_set_value(uint8_t *data) {
         switch (*value_id) {
             case id_board_mode: {
                 uint8_t value = value_data[0];
-                // Update board mode in runtime and EEPROM
+                // Board mode is an effective scanning mode. Do not rewrite the
+                // saved per-key switch map here; Hybrid mode relies on it.
                 runtime_hybrid_config.board_mode = value;
                 eeprom_hybrid_config.board_mode  = value;
-                if (value == BOARD_MODE_EC || value == BOARD_MODE_MX) {
-                    uint8_t switch_type                     = value == BOARD_MODE_EC ? SWITCH_TYPE_EC : SWITCH_TYPE_MX;
-                    runtime_hybrid_config.board_switch_type = switch_type;
-                    eeprom_hybrid_config.board_switch_type  = switch_type;
-                    update_keys_field(HYBRID_UPDATE_SHARED_OFFSET, offsetof(runtime_key_state_t, switch_type), 0, &switch_type, sizeof(uint8_t));
-                    eeconfig_update_kb_datablock_field(eeprom_hybrid_config, board_switch_type);
-                    eeconfig_update_kb_datablock_field(eeprom_hybrid_config, eeprom_key_state);
-                }
                 eeconfig_update_kb_datablock_field(eeprom_hybrid_config, board_mode);
                 if (value == 0) {
                     uprintf("#########################\n");
