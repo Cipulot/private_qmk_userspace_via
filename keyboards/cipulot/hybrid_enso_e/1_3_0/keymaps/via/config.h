@@ -17,4 +17,4 @@
 #pragma once
 
 #define VIA_FIRMWARE_VERSION 2
-
+#define HYBRID_DEBUG_KEY_EVENTS

@@ -35,6 +35,7 @@ static void     hybrid_show_calibration_data(void);
 static void     hybrid_clear_bottoming_calibration_data(void);
 static void     factory_reset(void);
 static uint16_t socd_pair_handler(bool mode, uint8_t pair_idx, uint8_t field, uint16_t value);
+static void     hybrid_update_main_cluster_field(update_mode_t mode, size_t runtime_offset, size_t eeprom_offset, const void *value, size_t field_size);
 
 typedef enum {
     CAL_PRINT_SWITCH_TYPE,
@@ -59,6 +60,24 @@ static bool hybrid_key_is_effective_ec(uint8_t row, uint8_t col) {
     }
 
     return false;
+}
+
+static void hybrid_update_main_cluster_field(update_mode_t mode, size_t runtime_offset, size_t eeprom_offset, const void *value, size_t field_size) {
+    if (runtime_hybrid_config.board_mode != BOARD_MODE_HYBRID) {
+        update_keys_field(mode, runtime_offset, eeprom_offset, value, field_size);
+        return;
+    }
+
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+#ifdef SPECIAL_POSITIONS_LIST
+            if (is_special_position(row, col)) {
+                continue;
+            }
+#endif
+            update_single_key_field(mode, runtime_offset, eeprom_offset, value, field_size, row, col);
+        }
+    }
 }
 
 static uint16_t calibration_get_print_value(calibration_print_field_t field, uint8_t row, uint8_t col) {
@@ -418,7 +437,7 @@ void via_config_set_value(uint8_t *data) {
                 runtime_hybrid_config.board_switch_type = value;
                 eeprom_hybrid_config.board_switch_type  = value;
                 // Update only the per-key switch_type field in runtime and EEPROM (shared offset)
-                update_keys_field(HYBRID_UPDATE_SHARED_OFFSET, offsetof(runtime_key_state_t, switch_type), 0, &value, sizeof(uint8_t));
+                hybrid_update_main_cluster_field(HYBRID_UPDATE_SHARED_OFFSET, offsetof(runtime_key_state_t, switch_type), 0, &value, sizeof(uint8_t));
                 eeconfig_update_kb_datablock_field(eeprom_hybrid_config, board_switch_type);
                 eeconfig_update_kb_datablock_field(eeprom_hybrid_config, eeprom_key_state);
                 if (value == 0) {
@@ -438,7 +457,7 @@ void via_config_set_value(uint8_t *data) {
                 runtime_hybrid_config.board_actuation_mode = value;
                 eeprom_hybrid_config.board_actuation_mode  = value;
                 // Update only the per-key actuation_mode field in runtime and EEPROM (shared offset)
-                update_keys_field(HYBRID_UPDATE_SHARED_OFFSET, offsetof(runtime_key_state_t, actuation_mode), 0, &value, sizeof(uint8_t));
+                hybrid_update_main_cluster_field(HYBRID_UPDATE_SHARED_OFFSET, offsetof(runtime_key_state_t, actuation_mode), 0, &value, sizeof(uint8_t));
                 eeconfig_update_kb_datablock_field(eeprom_hybrid_config, board_actuation_mode);
                 eeconfig_update_kb_datablock_field(eeprom_hybrid_config, eeprom_key_state);
                 if (runtime_hybrid_config.board_mode == BOARD_MODE_EC) {
@@ -470,7 +489,7 @@ void via_config_set_value(uint8_t *data) {
                 runtime_hybrid_config.board_apc_actuation_threshold = value;
                 eeprom_hybrid_config.board_apc_actuation_threshold  = value;
                 // Update only the per-key actuation_mode field in runtime and EEPROM (shared offset)
-                update_keys_field(HYBRID_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, apc_actuation_threshold), 0, &value, sizeof(uint16_t));
+                hybrid_update_main_cluster_field(HYBRID_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, apc_actuation_threshold), 0, &value, sizeof(uint16_t));
                 if (runtime_hybrid_config.board_mode == BOARD_MODE_EC) {
                     if (value == 0) {
                         uprintf("Full Board Actuation Threshold: %d\n", value);
@@ -491,7 +510,7 @@ void via_config_set_value(uint8_t *data) {
                 // Update switch type in runtime and EEPROM for full board
                 runtime_hybrid_config.board_apc_release_threshold = value;
                 eeprom_hybrid_config.board_apc_release_threshold  = value;
-                update_keys_field(HYBRID_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, apc_release_threshold), 0, &value, sizeof(uint16_t));
+                hybrid_update_main_cluster_field(HYBRID_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, apc_release_threshold), 0, &value, sizeof(uint16_t));
                 if (runtime_hybrid_config.board_mode == BOARD_MODE_EC) {
                     if (value == 0) {
                         uprintf("Full Board Release Threshold: %d\n", value);
@@ -513,7 +532,7 @@ void via_config_set_value(uint8_t *data) {
                 runtime_hybrid_config.board_rt_initial_deadzone_offset = value;
                 eeprom_hybrid_config.board_rt_initial_deadzone_offset  = value;
                 // Update only the per-key actuation_mode field in runtime and EEPROM (shared offset)
-                update_keys_field(HYBRID_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, rt_initial_deadzone_offset), 0, &value, sizeof(uint16_t));
+                hybrid_update_main_cluster_field(HYBRID_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, rt_initial_deadzone_offset), 0, &value, sizeof(uint16_t));
                 if (runtime_hybrid_config.board_mode == BOARD_MODE_EC) {
                     if (value == 0) {
                         uprintf("Full Board Rapid Trigger Initial Deadzone Offset: %d\n", value);
@@ -535,7 +554,7 @@ void via_config_set_value(uint8_t *data) {
                 runtime_hybrid_config.board_rt_actuation_offset = value;
                 eeprom_hybrid_config.board_rt_actuation_offset  = value;
                 // Update only the per-key actuation_mode field in runtime and EEPROM (shared offset)
-                update_keys_field(HYBRID_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, rt_actuation_offset), 0, &value, sizeof(uint8_t));
+                hybrid_update_main_cluster_field(HYBRID_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, rt_actuation_offset), 0, &value, sizeof(uint8_t));
                 if (runtime_hybrid_config.board_mode == BOARD_MODE_EC) {
                     if (value == 0) {
                         uprintf("Full Board Rapid Trigger Actuation Offset: %d\n", value);
@@ -557,7 +576,7 @@ void via_config_set_value(uint8_t *data) {
                 runtime_hybrid_config.board_rt_release_offset = value;
                 eeprom_hybrid_config.board_rt_release_offset  = value;
                 // Update only the per-key actuation_mode field in runtime and EEPROM (shared offset)
-                update_keys_field(HYBRID_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, rt_release_offset), 0, &value, sizeof(uint8_t));
+                hybrid_update_main_cluster_field(HYBRID_UPDATE_RUNTIME_ONLY, offsetof(runtime_key_state_t, rt_release_offset), 0, &value, sizeof(uint8_t));
                 if (runtime_hybrid_config.board_mode == BOARD_MODE_EC) {
                     if (value == 0) {
                         uprintf("Full Board Rapid Trigger Release Offset: %d\n", value);
