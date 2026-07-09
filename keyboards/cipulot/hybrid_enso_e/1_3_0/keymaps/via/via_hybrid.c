@@ -17,15 +17,26 @@
 #include "action.h"
 #include "print.h"
 #include "via.h"
+#include "version.h"
+#include <assert.h>
 #include <string.h>
 #include "generated_calibration_layout.h"
+#include "usb_descriptor.h"
 
 #ifdef SPLIT_KEYBOARD
 #    include "transactions.h"
-#    include "usb_descriptor.h"
 #endif
 
 #ifdef VIA_ENABLE
+
+#    ifndef RAW_EPSIZE
+#        error RAW_EPSIZE must be defined to size VIA text value responses
+#    endif
+
+#    define HYBRID_VIA_TEXT_VALUE_MAX_LEN (RAW_EPSIZE - 4)
+
+static_assert(HYBRID_VIA_TEXT_VALUE_MAX_LEN > 0, "RAW_EPSIZE is too small for VIA text value responses");
+static_assert(HYBRID_VIA_TEXT_VALUE_MAX_LEN <= 29, "Unexpected RAW_EPSIZE for VIA text value responses; review app-side text decoding limits");
 
 // Function prototypes
 static void     hybrid_save_threshold_data(uint8_t option);
@@ -36,6 +47,8 @@ static void     hybrid_clear_bottoming_calibration_data(void);
 static void     factory_reset(void);
 static uint16_t socd_pair_handler(bool mode, uint8_t pair_idx, uint8_t field, uint16_t value);
 static void     hybrid_update_main_cluster_field(update_mode_t mode, size_t runtime_offset, size_t eeprom_offset, const void *value, size_t field_size);
+static void     hybrid_get_firmware_version_text(uint8_t *value_data);
+static void     hybrid_get_build_text(uint8_t *value_data);
 
 typedef enum {
     CAL_PRINT_SWITCH_TYPE,
@@ -70,11 +83,11 @@ static void hybrid_update_main_cluster_field(update_mode_t mode, size_t runtime_
 
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
         for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-#ifdef SPECIAL_POSITIONS_LIST
+#    ifdef SPECIAL_POSITIONS_LIST
             if (is_special_position(row, col)) {
                 continue;
             }
-#endif
+#    endif
             update_single_key_field(mode, runtime_offset, eeprom_offset, value, field_size, row, col);
         }
     }
@@ -308,6 +321,8 @@ enum via_enums {
     id_board_mode = 109,
     id_flash_mode = 110,
     id_factory_reset = 111,
+    id_firmware_version_text = 112,
+    id_firmware_build_text = 113,
     // clang-format on
 };
 
@@ -837,6 +852,12 @@ void via_config_get_value(uint8_t *data) {
                 value_data[0]    = socd_pair_result >> 8;
                 value_data[1]    = socd_pair_result & 0xFF;
                 break;
+            case id_firmware_version_text:
+                hybrid_get_firmware_version_text(value_data);
+                break;
+            case id_firmware_build_text:
+                hybrid_get_build_text(value_data);
+                break;
             default: {
                 // Unhandled value.
                 break;
@@ -876,6 +897,32 @@ void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
     }
 
     *command_id = id_unhandled;
+}
+
+static void hybrid_get_firmware_version_text(uint8_t *value_data) {
+    uint32_t value = VIA_FIRMWARE_VERSION;
+    char     text[11];
+    uint8_t  text_len = 0;
+
+    if (value == 0) {
+        text[text_len++] = '0';
+    } else {
+        while (value > 0 && text_len < sizeof(text)) {
+            text[text_len++] = '0' + (value % 10);
+            value /= 10;
+        }
+    }
+
+    uint8_t out_len = 0;
+    while (text_len > 0 && out_len < HYBRID_VIA_TEXT_VALUE_MAX_LEN) {
+        value_data[out_len++] = text[--text_len];
+    }
+    value_data[out_len] = 0;
+}
+
+static void hybrid_get_build_text(uint8_t *value_data) {
+    strncpy((char *)value_data, QMK_BUILDDATE, HYBRID_VIA_TEXT_VALUE_MAX_LEN);
+    value_data[HYBRID_VIA_TEXT_VALUE_MAX_LEN] = 0;
 }
 
 // Handle the application of new threshold data and save to EEPROM
