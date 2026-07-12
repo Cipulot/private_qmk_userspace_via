@@ -17,18 +17,32 @@
 #include "action.h"
 #include "print.h"
 #include "via.h"
+#include "version.h"
+#include "usb_descriptor.h"
+#include <assert.h>
 #include <string.h>
 
 #ifdef SPLIT_KEYBOARD
 #    include "transactions.h"
-#    include "usb_descriptor.h"
 #endif
 
 #ifdef VIA_ENABLE
 
+#    ifndef RAW_EPSIZE
+#        error RAW_EPSIZE must be defined to size VIA text value responses
+#    endif
+
+#    define VIA_TEXT_VALUE_MAX_LEN (RAW_EPSIZE - 4)
+
+_Static_assert(VIA_TEXT_VALUE_MAX_LEN > 0, "RAW_EPSIZE is too small for VIA text value responses");
+_Static_assert(VIA_TEXT_VALUE_MAX_LEN <= 29, "Unexpected RAW_EPSIZE for VIA text value responses; review app-side text decoding limits");
+
 // Function prototypes
 static void factory_reset(void);
 static uint16_t socd_pair_handler(bool mode, uint8_t pair_idx, uint8_t field, uint16_t value);
+
+static void     via_get_firmware_version_text(uint8_t *value_data);
+static void     via_get_build_text(uint8_t *value_data);
 
 // Declaring enums for VIA config menu
 enum via_enums {
@@ -55,6 +69,8 @@ enum via_enums {
     id_socd_pair_4_key_2 = 20,
     id_flash_mode = 21,
     id_factory_reset = 22,
+    id_firmware_version_text = 23,
+    id_firmware_build_text = 24,
     // clang-format on
 };
 
@@ -276,6 +292,12 @@ void via_config_get_value(uint8_t *data) {
                 value_data[0]    = socd_pair_result >> 8;
                 value_data[1]    = socd_pair_result & 0xFF;
                 break;
+            case id_firmware_version_text:
+                via_get_firmware_version_text(value_data);
+                break;
+            case id_firmware_build_text:
+                via_get_build_text(value_data);
+                break;
             default: {
                 // Unhandled value.
                 break;
@@ -366,6 +388,32 @@ static uint16_t socd_pair_handler(bool mode, uint8_t pair_idx, uint8_t field, ui
 }
 
 // Factory reset the board (unplug/replug requirement is merely a way to have UI refresh from a new connection)
+static void via_get_firmware_version_text(uint8_t *value_data) {
+    uint32_t value = (VIA_FIRMWARE_VERSION == 0) ? 1 : VIA_FIRMWARE_VERSION;
+    char     text[11];
+    uint8_t  text_len = 0;
+
+    if (value == 0) {
+        text[text_len++] = '0';
+    } else {
+        while (value > 0 && text_len < sizeof(text)) {
+            text[text_len++] = '0' + (value % 10);
+            value /= 10;
+        }
+    }
+
+    uint8_t out_len = 0;
+    while (text_len > 0 && out_len < VIA_TEXT_VALUE_MAX_LEN) {
+        value_data[out_len++] = text[--text_len];
+    }
+    value_data[out_len] = 0;
+}
+
+static void via_get_build_text(uint8_t *value_data) {
+    strncpy((char *)value_data, QMK_BUILDDATE, VIA_TEXT_VALUE_MAX_LEN);
+    value_data[VIA_TEXT_VALUE_MAX_LEN] = 0;
+}
+
 static void factory_reset(void) {
     // Clear the EEPROM data
     eeconfig_init_kb();

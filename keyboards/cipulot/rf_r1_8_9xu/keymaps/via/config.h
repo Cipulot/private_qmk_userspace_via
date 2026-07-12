@@ -16,5 +16,4 @@
 
 #pragma once
 
-#define VIA_FIRMWARE_VERSION 3
-
+#define VIA_FIRMWARE_VERSION 4

@@ -35,8 +35,8 @@
 
 #    define HYBRID_VIA_TEXT_VALUE_MAX_LEN (RAW_EPSIZE - 4)
 
-static_assert(HYBRID_VIA_TEXT_VALUE_MAX_LEN > 0, "RAW_EPSIZE is too small for VIA text value responses");
-static_assert(HYBRID_VIA_TEXT_VALUE_MAX_LEN <= 29, "Unexpected RAW_EPSIZE for VIA text value responses; review app-side text decoding limits");
+_Static_assert(HYBRID_VIA_TEXT_VALUE_MAX_LEN > 0, "RAW_EPSIZE is too small for VIA text value responses");
+_Static_assert(HYBRID_VIA_TEXT_VALUE_MAX_LEN <= 29, "Unexpected RAW_EPSIZE for VIA text value responses; review app-side text decoding limits");
 
 // Function prototypes
 static void     hybrid_save_threshold_data(uint8_t option);
@@ -900,7 +900,7 @@ void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
 }
 
 static void hybrid_get_firmware_version_text(uint8_t *value_data) {
-    uint32_t value = VIA_FIRMWARE_VERSION;
+    uint32_t value = (VIA_FIRMWARE_VERSION == 0) ? 1 : VIA_FIRMWARE_VERSION;
     char     text[11];
     uint8_t  text_len = 0;
 

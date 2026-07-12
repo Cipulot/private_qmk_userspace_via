@@ -19,6 +19,10 @@
 #include "action.h"
 #include "print.h"
 #include "via.h"
+#include "version.h"
+#include "usb_descriptor.h"
+#include <assert.h>
+#include <string.h>
 
 #ifdef SPLIT_KEYBOARD
 #    include "transactions.h"
@@ -26,12 +30,50 @@
 
 #ifdef VIA_ENABLE
 
+#    ifndef RAW_EPSIZE
+#        error RAW_EPSIZE must be defined to size VIA text value responses
+#    endif
+
+#    define EC_VIA_TEXT_VALUE_MAX_LEN (RAW_EPSIZE - 4)
+
+_Static_assert(EC_VIA_TEXT_VALUE_MAX_LEN > 0, "RAW_EPSIZE is too small for VIA text value responses");
+_Static_assert(EC_VIA_TEXT_VALUE_MAX_LEN <= 29, "Unexpected RAW_EPSIZE for VIA text value responses; review app-side text decoding limits");
+
 void ec_rescale_values(uint8_t item);
+static void ec_get_firmware_version_text(uint8_t *value_data) {
+    uint32_t value = (VIA_FIRMWARE_VERSION == 0) ? 1 : VIA_FIRMWARE_VERSION;
+    char     text[11];
+    uint8_t  text_len = 0;
+
+    if (value == 0) {
+        text[text_len++] = '0';
+    } else {
+        while (value > 0 && text_len < sizeof(text)) {
+            text[text_len++] = '0' + (value % 10);
+            value /= 10;
+        }
+    }
+
+    uint8_t out_len = 0;
+    while (text_len > 0 && out_len < EC_VIA_TEXT_VALUE_MAX_LEN) {
+        value_data[out_len++] = text[--text_len];
+    }
+    value_data[out_len] = 0;
+}
+
+static void ec_get_build_text(uint8_t *value_data) {
+    strncpy((char *)value_data, QMK_BUILDDATE, EC_VIA_TEXT_VALUE_MAX_LEN);
+    value_data[EC_VIA_TEXT_VALUE_MAX_LEN] = 0;
+}
+
 void ec_save_threshold_data(uint8_t option);
 void ec_save_bottoming_reading(void);
 void ec_show_calibration_data(void);
 void ec_clear_bottoming_calibration_data(void);
 
+
+static void     ec_get_firmware_version_text(uint8_t *value_data);
+static void     ec_get_build_text(uint8_t *value_data);
 
 typedef enum {
     CAL_PRINT_SWITCH_TYPE,
@@ -147,7 +189,10 @@ enum via_enums {
     id_bottoming_calibration = 8,
     id_noise_floor_calibration = 9,
     id_show_calibration_data = 10,
-    id_clear_bottoming_calibration_data = 11
+    id_clear_bottoming_calibration_data = 11,
+    id_firmware_version_text = 12,
+    id_firmware_build_text = 13,
+
     // clang-format on
 };
 
@@ -289,6 +334,12 @@ void via_config_get_value(uint8_t *data) {
             value_data[0] = eeprom_ec_config.mode_1_release_offset;
             break;
         }
+        case id_firmware_version_text:
+            ec_get_firmware_version_text(value_data);
+            break;
+        case id_firmware_build_text:
+            ec_get_build_text(value_data);
+            break;
         default: {
             // Unhandled value.
             break;

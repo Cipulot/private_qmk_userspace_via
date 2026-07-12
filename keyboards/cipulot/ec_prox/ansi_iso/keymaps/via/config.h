@@ -17,4 +17,4 @@
 #pragma once
 
 // This is the firmware version for VIA support to avoid conflicts on menu fetching
-#define VIA_FIRMWARE_VERSION 2
+#define VIA_FIRMWARE_VERSION 3

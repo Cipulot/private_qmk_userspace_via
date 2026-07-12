@@ -20,8 +20,21 @@
 #include "action.h"
 #include "print.h"
 #include "via.h"
+#include "version.h"
+#include "usb_descriptor.h"
+#include <assert.h>
+#include <string.h>
 
 #ifdef VIA_ENABLE
+
+#    ifndef RAW_EPSIZE
+#        error RAW_EPSIZE must be defined to size VIA text value responses
+#    endif
+
+#    define EC_VIA_TEXT_VALUE_MAX_LEN (RAW_EPSIZE - 4)
+
+_Static_assert(EC_VIA_TEXT_VALUE_MAX_LEN > 0, "RAW_EPSIZE is too small for VIA text value responses");
+_Static_assert(EC_VIA_TEXT_VALUE_MAX_LEN <= 29, "Unexpected RAW_EPSIZE for VIA text value responses; review app-side text decoding limits");
 
 void     ec_rescale_values(uint8_t item);
 void     ec_save_threshold_data(uint8_t option);
@@ -30,6 +43,9 @@ void     ec_show_calibration_data(void);
 void     ec_clear_bottoming_calibration_data(void);
 uint16_t socd_pair_handler(bool mode, uint8_t pair_idx, uint8_t field, uint16_t value);
 
+
+static void     ec_get_firmware_version_text(uint8_t *value_data);
+static void     ec_get_build_text(uint8_t *value_data);
 
 typedef enum {
     CAL_PRINT_SWITCH_TYPE,
@@ -162,6 +178,8 @@ enum via_enums {
     id_socd_pair_4_key_1 = 25,
     id_socd_pair_4_key_2 = 26,
     id_socd_pair_4_mode = 27,
+    id_firmware_version_text = 28,
+    id_firmware_build_text = 29,
     // clang-format on
 };
 
@@ -410,6 +428,12 @@ void via_config_get_value(uint8_t *data) {
         case id_socd_pair_4_mode:
             value_data[0] = socd_pair_handler(0, 3, 3, 0);
             break;
+        case id_firmware_version_text:
+            ec_get_firmware_version_text(value_data);
+            break;
+        case id_firmware_build_text:
+            ec_get_build_text(value_data);
+            break;
         default: {
             // Unhandled value.
             break;
@@ -498,6 +522,32 @@ void ec_rescale_values(uint8_t item) {
             // Unhandled item.
             break;
     }
+}
+
+static void ec_get_firmware_version_text(uint8_t *value_data) {
+    uint32_t value = (VIA_FIRMWARE_VERSION == 0) ? 1 : VIA_FIRMWARE_VERSION;
+    char     text[11];
+    uint8_t  text_len = 0;
+
+    if (value == 0) {
+        text[text_len++] = '0';
+    } else {
+        while (value > 0 && text_len < sizeof(text)) {
+            text[text_len++] = '0' + (value % 10);
+            value /= 10;
+        }
+    }
+
+    uint8_t out_len = 0;
+    while (text_len > 0 && out_len < EC_VIA_TEXT_VALUE_MAX_LEN) {
+        value_data[out_len++] = text[--text_len];
+    }
+    value_data[out_len] = 0;
+}
+
+static void ec_get_build_text(uint8_t *value_data) {
+    strncpy((char *)value_data, QMK_BUILDDATE, EC_VIA_TEXT_VALUE_MAX_LEN);
+    value_data[EC_VIA_TEXT_VALUE_MAX_LEN] = 0;
 }
 
 void ec_save_threshold_data(uint8_t option) {

@@ -17,15 +17,26 @@
 #include "action.h"
 #include "print.h"
 #include "via.h"
+#include "version.h"
+#include "usb_descriptor.h"
+#include <assert.h>
 #include <string.h>
 #include "generated_calibration_layout.h"
 
 #ifdef SPLIT_KEYBOARD
 #    include "transactions.h"
-#    include "usb_descriptor.h"
 #endif
 
 #ifdef VIA_ENABLE
+
+#    ifndef RAW_EPSIZE
+#        error RAW_EPSIZE must be defined to size VIA text value responses
+#    endif
+
+#    define HYBRID_VIA_TEXT_VALUE_MAX_LEN (RAW_EPSIZE - 4)
+
+_Static_assert(HYBRID_VIA_TEXT_VALUE_MAX_LEN > 0, "RAW_EPSIZE is too small for VIA text value responses");
+_Static_assert(HYBRID_VIA_TEXT_VALUE_MAX_LEN <= 29, "Unexpected RAW_EPSIZE for VIA text value responses; review app-side text decoding limits");
 
 // Function prototypes
 static void     hybrid_save_threshold_data(uint8_t option);
@@ -34,6 +45,9 @@ static void     hybrid_show_calibration_data(void);
 static void     hybrid_clear_bottoming_calibration_data(void);
 static uint16_t socd_pair_handler(bool mode, uint8_t pair_idx, uint8_t field, uint16_t value);
 
+
+static void     hybrid_get_firmware_version_text(uint8_t *value_data);
+static void     hybrid_get_build_text(uint8_t *value_data);
 
 typedef enum {
     CAL_PRINT_SWITCH_TYPE,
@@ -175,7 +189,10 @@ enum via_enums {
     id_socd_pair_3_key_2 = 21,
     id_socd_pair_4_mode = 22,
     id_socd_pair_4_key_1 = 23,
-    id_socd_pair_4_key_2 = 24
+    id_socd_pair_4_key_2 = 24,
+    id_firmware_version_text = 25,
+    id_firmware_build_text = 26,
+
     // clang-format on
 };
 
@@ -446,6 +463,12 @@ void via_config_get_value(uint8_t *data) {
             value_data[0]    = socd_pair_result >> 8;
             value_data[1]    = socd_pair_result & 0xFF;
             break;
+        case id_firmware_version_text:
+            hybrid_get_firmware_version_text(value_data);
+            break;
+        case id_firmware_build_text:
+            hybrid_get_build_text(value_data);
+            break;
         default: {
             // Unhandled value.
             break;
@@ -487,6 +510,32 @@ void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
 }
 
 // Handle the application of new threshold data and save to EEPROM
+static void hybrid_get_firmware_version_text(uint8_t *value_data) {
+    uint32_t value = (VIA_FIRMWARE_VERSION == 0) ? 1 : VIA_FIRMWARE_VERSION;
+    char     text[11];
+    uint8_t  text_len = 0;
+
+    if (value == 0) {
+        text[text_len++] = '0';
+    } else {
+        while (value > 0 && text_len < sizeof(text)) {
+            text[text_len++] = '0' + (value % 10);
+            value /= 10;
+        }
+    }
+
+    uint8_t out_len = 0;
+    while (text_len > 0 && out_len < HYBRID_VIA_TEXT_VALUE_MAX_LEN) {
+        value_data[out_len++] = text[--text_len];
+    }
+    value_data[out_len] = 0;
+}
+
+static void hybrid_get_build_text(uint8_t *value_data) {
+    strncpy((char *)value_data, QMK_BUILDDATE, HYBRID_VIA_TEXT_VALUE_MAX_LEN);
+    value_data[HYBRID_VIA_TEXT_VALUE_MAX_LEN] = 0;
+}
+
 static void hybrid_save_threshold_data(uint8_t option) {
     // Save APC mode thresholds and rescale them for runtime usage
     if (option == 0) {
