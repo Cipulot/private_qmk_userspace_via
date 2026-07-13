@@ -67,7 +67,7 @@ static void ec_get_build_text(uint8_t *value_data) {
 }
 
 void ec_save_threshold_data(uint8_t option);
-void ec_save_bottoming_reading(void);
+void ec_save_bottoming_calibration_reading(void);
 void ec_show_calibration_data(void);
 void ec_clear_bottoming_calibration_data(void);
 
@@ -91,15 +91,15 @@ typedef enum {
 static uint16_t calibration_get_print_value(calibration_print_field_t field, uint8_t row, uint8_t col) {
     switch (field) {
         case CAL_PRINT_APC_ACTUATION:
-            return ec_config.rescaled_mode_0_actuation_threshold[row][col];
+            return ec_config.rescaled_apc_actuation_threshold[row][col];
         case CAL_PRINT_APC_RELEASE:
-            return ec_config.rescaled_mode_0_release_threshold[row][col];
+            return ec_config.rescaled_apc_release_threshold[row][col];
         case CAL_PRINT_RT_INITIAL_DEADZONE:
-            return ec_config.rescaled_mode_1_initial_deadzone_offset[row][col];
+            return ec_config.rescaled_rt_initial_deadzone_offset[row][col];
         case CAL_PRINT_NOISE_FLOOR:
             return ec_config.noise_floor[row][col];
         case CAL_PRINT_BOTTOMING:
-            return eeprom_ec_config.bottoming_reading[row][col];
+            return eeprom_ec_config.bottoming_calibration_reading[row][col];
         default:
             return 0;
     }
@@ -180,12 +180,12 @@ static void calibration_print_layout_field(calibration_print_field_t field) {
 enum via_enums {
     // clang-format off
     id_actuation_mode = 1,
-    id_mode_0_actuation_threshold = 2,
-    id_mode_0_release_threshold = 3,
+    id_apc_actuation_threshold = 2,
+    id_apc_release_threshold = 3,
     id_save_threshold_data = 4,
-    id_mode_1_initial_deadzone_offset = 5,
-    id_mode_1_actuation_offset = 6,
-    id_mode_1_release_offset = 7,
+    id_rt_initial_deadzone_offset = 5,
+    id_rt_actuation_offset = 6,
+    id_rt_release_offset = 7,
     id_bottoming_calibration = 8,
     id_noise_floor_calibration = 9,
     id_show_calibration_data = 10,
@@ -224,29 +224,29 @@ void via_config_set_value(uint8_t *data) {
             eeconfig_update_kb_datablock_field(eeprom_ec_config, actuation_mode);
             break;
         }
-        case id_mode_0_actuation_threshold: {
-            ec_config.mode_0_actuation_threshold = value_data[1] | (value_data[0] << 8);
-            uprintf("APC Mode Actuation Threshold: %d\n", ec_config.mode_0_actuation_threshold);
+        case id_apc_actuation_threshold: {
+            ec_config.apc_actuation_threshold = value_data[1] | (value_data[0] << 8);
+            uprintf("APC Mode Actuation Threshold: %d\n", ec_config.apc_actuation_threshold);
             break;
         }
-        case id_mode_0_release_threshold: {
-            ec_config.mode_0_release_threshold = value_data[1] | (value_data[0] << 8);
-            uprintf("APC Mode Release Threshold: %d\n", ec_config.mode_0_release_threshold);
+        case id_apc_release_threshold: {
+            ec_config.apc_release_threshold = value_data[1] | (value_data[0] << 8);
+            uprintf("APC Mode Release Threshold: %d\n", ec_config.apc_release_threshold);
             break;
         }
-        case id_mode_1_initial_deadzone_offset: {
-            ec_config.mode_1_initial_deadzone_offset = value_data[1] | (value_data[0] << 8);
-            uprintf("Rapid Trigger Mode Initial Deadzone Offset: %d\n", ec_config.mode_1_initial_deadzone_offset);
+        case id_rt_initial_deadzone_offset: {
+            ec_config.rt_initial_deadzone_offset = value_data[1] | (value_data[0] << 8);
+            uprintf("Rapid Trigger Mode Initial Deadzone Offset: %d\n", ec_config.rt_initial_deadzone_offset);
             break;
         }
-        case id_mode_1_actuation_offset: {
-            ec_config.mode_1_actuation_offset = value_data[0];
-            uprintf("Rapid Trigger Mode Actuation Offset: %d\n", ec_config.mode_1_actuation_offset);
+        case id_rt_actuation_offset: {
+            ec_config.rt_actuation_offset = value_data[0];
+            uprintf("Rapid Trigger Mode Actuation Offset: %d\n", ec_config.rt_actuation_offset);
             break;
         }
-        case id_mode_1_release_offset: {
-            ec_config.mode_1_release_offset = value_data[0];
-            uprintf("Rapid Trigger Mode Release Offset: %d\n", ec_config.mode_1_release_offset);
+        case id_rt_release_offset: {
+            ec_config.rt_release_offset = value_data[0];
+            uprintf("Rapid Trigger Mode Release Offset: %d\n", ec_config.rt_release_offset);
             break;
         }
         case id_bottoming_calibration: {
@@ -257,7 +257,7 @@ void via_config_set_value(uint8_t *data) {
                 uprintf("##############################\n");
             } else {
                 ec_config.bottoming_calibration = false;
-                ec_save_bottoming_reading();
+                ec_save_bottoming_calibration_reading();
                 uprintf("## Calibration Completed ##\n");
                 ec_show_calibration_data();
             }
@@ -311,27 +311,27 @@ void via_config_get_value(uint8_t *data) {
             value_data[0] = eeprom_ec_config.actuation_mode;
             break;
         }
-        case id_mode_0_actuation_threshold: {
-            value_data[0] = eeprom_ec_config.mode_0_actuation_threshold >> 8;
-            value_data[1] = eeprom_ec_config.mode_0_actuation_threshold & 0xFF;
+        case id_apc_actuation_threshold: {
+            value_data[0] = eeprom_ec_config.apc_actuation_threshold >> 8;
+            value_data[1] = eeprom_ec_config.apc_actuation_threshold & 0xFF;
             break;
         }
-        case id_mode_0_release_threshold: {
-            value_data[0] = eeprom_ec_config.mode_0_release_threshold >> 8;
-            value_data[1] = eeprom_ec_config.mode_0_release_threshold & 0xFF;
+        case id_apc_release_threshold: {
+            value_data[0] = eeprom_ec_config.apc_release_threshold >> 8;
+            value_data[1] = eeprom_ec_config.apc_release_threshold & 0xFF;
             break;
         }
-        case id_mode_1_initial_deadzone_offset: {
-            value_data[0] = eeprom_ec_config.mode_1_initial_deadzone_offset >> 8;
-            value_data[1] = eeprom_ec_config.mode_1_initial_deadzone_offset & 0xFF;
+        case id_rt_initial_deadzone_offset: {
+            value_data[0] = eeprom_ec_config.rt_initial_deadzone_offset >> 8;
+            value_data[1] = eeprom_ec_config.rt_initial_deadzone_offset & 0xFF;
             break;
         }
-        case id_mode_1_actuation_offset: {
-            value_data[0] = eeprom_ec_config.mode_1_actuation_offset;
+        case id_rt_actuation_offset: {
+            value_data[0] = eeprom_ec_config.rt_actuation_offset;
             break;
         }
-        case id_mode_1_release_offset: {
-            value_data[0] = eeprom_ec_config.mode_1_release_offset;
+        case id_rt_release_offset: {
+            value_data[0] = eeprom_ec_config.rt_release_offset;
             break;
         }
         case id_firmware_version_text:
@@ -387,7 +387,7 @@ void ec_rescale_values(uint8_t item) {
         case 0:
             for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
                 for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-                    ec_config.rescaled_mode_0_actuation_threshold[row][col] = rescale(ec_config.mode_0_actuation_threshold, ec_config.noise_floor[row][col], eeprom_ec_config.bottoming_reading[row][col]);
+                    ec_config.rescaled_apc_actuation_threshold[row][col] = rescale(ec_config.apc_actuation_threshold, ec_config.noise_floor[row][col], eeprom_ec_config.bottoming_calibration_reading[row][col]);
                 }
             }
             break;
@@ -395,7 +395,7 @@ void ec_rescale_values(uint8_t item) {
         case 1:
             for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
                 for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-                    ec_config.rescaled_mode_0_release_threshold[row][col] = rescale(ec_config.mode_0_release_threshold, ec_config.noise_floor[row][col], eeprom_ec_config.bottoming_reading[row][col]);
+                    ec_config.rescaled_apc_release_threshold[row][col] = rescale(ec_config.apc_release_threshold, ec_config.noise_floor[row][col], eeprom_ec_config.bottoming_calibration_reading[row][col]);
                 }
             }
             break;
@@ -403,7 +403,7 @@ void ec_rescale_values(uint8_t item) {
         case 2:
             for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
                 for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-                    ec_config.rescaled_mode_1_initial_deadzone_offset[row][col] = rescale(ec_config.mode_1_initial_deadzone_offset, ec_config.noise_floor[row][col], eeprom_ec_config.bottoming_reading[row][col]);
+                    ec_config.rescaled_rt_initial_deadzone_offset[row][col] = rescale(ec_config.rt_initial_deadzone_offset, ec_config.noise_floor[row][col], eeprom_ec_config.bottoming_calibration_reading[row][col]);
                 }
             }
             break;
@@ -411,7 +411,7 @@ void ec_rescale_values(uint8_t item) {
         case 3:
             for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
                 for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-                    ec_config.rescaled_mode_1_actuation_offset[row][col] = rescale(ec_config.mode_1_actuation_offset, ec_config.noise_floor[row][col], eeprom_ec_config.bottoming_reading[row][col]);
+                    ec_config.rescaled_rt_actuation_offset[row][col] = rescale(ec_config.rt_actuation_offset, ec_config.noise_floor[row][col], eeprom_ec_config.bottoming_calibration_reading[row][col]);
                 }
             }
             break;
@@ -419,7 +419,7 @@ void ec_rescale_values(uint8_t item) {
         case 4:
             for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
                 for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-                    ec_config.rescaled_mode_1_release_offset[row][col] = rescale(ec_config.mode_1_release_offset, ec_config.noise_floor[row][col], eeprom_ec_config.bottoming_reading[row][col]);
+                    ec_config.rescaled_rt_release_offset[row][col] = rescale(ec_config.rt_release_offset, ec_config.noise_floor[row][col], eeprom_ec_config.bottoming_calibration_reading[row][col]);
                 }
             }
             break;
@@ -433,16 +433,16 @@ void ec_rescale_values(uint8_t item) {
 void ec_save_threshold_data(uint8_t option) {
     // Save APC mode thresholds and rescale them for runtime usage
     if (option == 0) {
-        eeprom_ec_config.mode_0_actuation_threshold = ec_config.mode_0_actuation_threshold;
-        eeprom_ec_config.mode_0_release_threshold   = ec_config.mode_0_release_threshold;
+        eeprom_ec_config.apc_actuation_threshold = ec_config.apc_actuation_threshold;
+        eeprom_ec_config.apc_release_threshold   = ec_config.apc_release_threshold;
         ec_rescale_values(0);
         ec_rescale_values(1);
     }
     // Save Rapid Trigger mode thresholds and rescale them for runtime usage
     else if (option == 1) {
-        eeprom_ec_config.mode_1_initial_deadzone_offset = ec_config.mode_1_initial_deadzone_offset;
-        eeprom_ec_config.mode_1_actuation_offset        = ec_config.mode_1_actuation_offset;
-        eeprom_ec_config.mode_1_release_offset          = ec_config.mode_1_release_offset;
+        eeprom_ec_config.rt_initial_deadzone_offset = ec_config.rt_initial_deadzone_offset;
+        eeprom_ec_config.rt_actuation_offset        = ec_config.rt_actuation_offset;
+        eeprom_ec_config.rt_release_offset          = ec_config.rt_release_offset;
         ec_rescale_values(2);
         ec_rescale_values(3);
         ec_rescale_values(4);
@@ -454,7 +454,7 @@ void ec_save_threshold_data(uint8_t option) {
 }
 
 // Save the bottoming reading
-void ec_save_bottoming_reading(void) {
+void ec_save_bottoming_calibration_reading(void) {
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
         for (uint8_t col = 0; col < MATRIX_COLS; col++) {
             // If the calibration starter flag is still set on the key, it indicates that the key was skipped during the scan because it is not physically present.
@@ -462,10 +462,10 @@ void ec_save_bottoming_reading(void) {
             // 1. The key is part of an alternative layout and is not being pressed.
             // 2. The key is in the current layout but is not being pressed.
             // In both conditions we should set the bottoming reading to the maximum value to avoid false positives.
-            if (ec_config.bottoming_calibration_starter[row][col] || ec_config.bottoming_reading[row][col] < (ec_config.noise_floor[row][col] + BOTTOMING_CALIBRATION_THRESHOLD)) {
-                eeprom_ec_config.bottoming_reading[row][col] = 1023;
+            if (ec_config.bottoming_calibration_starter[row][col] || ec_config.bottoming_calibration_reading[row][col] < (ec_config.noise_floor[row][col] + BOTTOMING_CALIBRATION_THRESHOLD)) {
+                eeprom_ec_config.bottoming_calibration_reading[row][col] = 1023;
             } else {
-                eeprom_ec_config.bottoming_reading[row][col] = ec_config.bottoming_reading[row][col];
+                eeprom_ec_config.bottoming_calibration_reading[row][col] = ec_config.bottoming_calibration_reading[row][col];
             }
         }
     }
@@ -493,19 +493,19 @@ void ec_show_calibration_data(void) {
     uprintf("\n######################################\n");
     uprintf("# Rescaled APC Mode Actuation Points #\n");
     uprintf("######################################\n");
-    uprintf("Original APC Mode Actuation Point: %4d\n", ec_config.mode_0_actuation_threshold);
+    uprintf("Original APC Mode Actuation Point: %4d\n", ec_config.apc_actuation_threshold);
     calibration_print_layout_field(CAL_PRINT_APC_ACTUATION);
 
     uprintf("\n######################################\n");
     uprintf("# Rescaled APC Mode Release Points   #\n");
     uprintf("######################################\n");
-    uprintf("Original APC Mode Release Point: %4d\n", ec_config.mode_0_release_threshold);
+    uprintf("Original APC Mode Release Point: %4d\n", ec_config.apc_release_threshold);
     calibration_print_layout_field(CAL_PRINT_APC_RELEASE);
 
     uprintf("\n#######################################################\n");
     uprintf("# Rescaled Rapid Trigger Mode Initial Deadzone Offset #\n");
     uprintf("#######################################################\n");
-    uprintf("Original Rapid Trigger Mode Initial Deadzone Offset: %4d\n", ec_config.mode_1_initial_deadzone_offset);
+    uprintf("Original Rapid Trigger Mode Initial Deadzone Offset: %4d\n", ec_config.rt_initial_deadzone_offset);
     calibration_print_layout_field(CAL_PRINT_RT_INITIAL_DEADZONE);
     print("\n");
 }
