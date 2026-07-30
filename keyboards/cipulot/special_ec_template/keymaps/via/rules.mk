@@ -9,4 +9,6 @@ include keyboards/cipulot/common/runtime_features.mk
 SRC += keyboards/cipulot/common/general/ec/ec_config.c
 SRC += keyboards/cipulot/common/general/ec/runtime/ec_runtime_features.c
 SRC += keyboards/cipulot/common/shared/runtime/feature_config.c
+SRC += keyboards/cipulot/common/shared/via/via_ec_adapter.c
+SRC += keyboards/cipulot/common/shared/via/via_ec_values.c
 SRC += keyboards/cipulot/special_ec_template/via_special_ec_template.c

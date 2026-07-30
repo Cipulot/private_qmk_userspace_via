@@ -4,37 +4,27 @@
 
 #pragma once
 
-#include "quantum.h"
-#include "util.h"
-#include "socd_cleaner.h"
+#include <stddef.h>
 
-// Indicator configuration structure definitions
-typedef struct PACKED {
-    uint8_t h;
-    uint8_t s;
-    uint8_t v;
-    uint8_t func;
-    uint8_t index;
-    bool    enabled;
-} indicator_config;
+#include "quantum.h"
+#include "keyboards/cipulot/common/extensions/indicators/rgb_indicator_config.h"
+#include "keyboards/cipulot/common/shared/config/socd_config.h"
+#include "keyboards/cipulot/common/shared/extension.h"
+#include "util.h"
+
+#define LEILA_MX_INDICATOR_COUNT 3
 
 // EEPROM configuration structure definitions
 typedef struct PACKED {
-    indicator_config ind1;
-    indicator_config ind2;
-    indicator_config ind3;
-    socd_cleaner_t   eeprom_socd_opposing_pairs[4]; // SOCD cleaner pairs
+    cipulot_rgb_indicator_config_t indicators[LEILA_MX_INDICATOR_COUNT];
+    socd_cleaner_t                 eeprom_socd_opposing_pairs[SOCD_PAIR_COUNT];
 } eeprom_mx_config_t;
 
-// Compile-time check for EECONFIG_KB_DATA_SIZE
+// Compile-time checks for the released EEPROM layout
 _Static_assert(sizeof(eeprom_mx_config_t) == EECONFIG_KB_DATA_SIZE, "Mismatch in keyboard EECONFIG stored data");
+_Static_assert(offsetof(eeprom_mx_config_t, indicators) == 0, "Leila MX indicator EEPROM offset must remain stable");
+_Static_assert(offsetof(eeprom_mx_config_t, eeprom_socd_opposing_pairs) == 18, "Leila MX SOCD EEPROM offset must remain stable");
 
-// Extern declarations
 extern eeprom_mx_config_t eeprom_mx_config;
-// Runtime SOCD cleaner pairs
-// For now it can't be part of runtime_ec_config_t due to how the submodule checks for the existance of the structure
-extern socd_cleaner_t socd_opposing_pairs[4];
 
-extern uint8_t   *pIndicators;
-indicator_config *get_indicator_p(int index);
-bool              indicators_callback(void);
+bool leila_mx_indicator_extension_apply(void);

@@ -2,16 +2,18 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-#include "quantum.h"
+#include <string.h>
+
 #include "mx.h"
 
 eeprom_mx_config_t eeprom_mx_config;
-socd_cleaner_t     socd_opposing_pairs[4];
+socd_cleaner_t     socd_opposing_pairs[SOCD_PAIR_COUNT];
 
-// EEPROM default initialization
+static void save_socd_config(void) {
+    eeconfig_update_kb_datablock_field(eeprom_mx_config, eeprom_socd_opposing_pairs);
+}
+
 void eeconfig_init_kb(void) {
-
-    // Initialize the SOCD cleaner pairs
     const struct {
         uint16_t key1;
         uint16_t key2;
@@ -22,8 +24,9 @@ void eeconfig_init_kb(void) {
         {KC_LEFT, KC_RIGHT},
     };
 
-    // Copy default SOCD pairs to EEPROM
-    for (int i = 0; i < 4; i++) {
+    _Static_assert(ARRAY_SIZE(socd_pairs) == SOCD_PAIR_COUNT, "Logos MX must define defaults for every SOCD pair");
+
+    for (uint8_t i = 0; i < SOCD_PAIR_COUNT; i++) {
         eeprom_mx_config.eeprom_socd_opposing_pairs[i].keys[0]    = socd_pairs[i].key1;
         eeprom_mx_config.eeprom_socd_opposing_pairs[i].keys[1]    = socd_pairs[i].key2;
         eeprom_mx_config.eeprom_socd_opposing_pairs[i].resolution = SOCD_CLEANER_OFF;
@@ -31,21 +34,21 @@ void eeconfig_init_kb(void) {
         eeprom_mx_config.eeprom_socd_opposing_pairs[i].held[1]    = false;
     }
 
-    // Write to EEPROM entire datablock
     eeconfig_update_kb_datablock(&eeprom_mx_config, 0, EECONFIG_KB_DATA_SIZE);
-
-    // Call user initialization
     eeconfig_init_user();
 }
 
-// Keyboard post-initialization
 void keyboard_post_init_kb(void) {
-    // Read the EEPROM data block
     eeconfig_read_kb_datablock(&eeprom_mx_config, 0, EECONFIG_KB_DATA_SIZE);
-
-    // Copy SOCD cleaner pairs to runtime instance
     memcpy(socd_opposing_pairs, eeprom_mx_config.eeprom_socd_opposing_pairs, sizeof(socd_opposing_pairs));
 
-    // Call user post-initialization
+    const socd_config_context_t socd_context = {
+        .runtime_pairs = socd_opposing_pairs,
+        .stored_pairs  = eeprom_mx_config.eeprom_socd_opposing_pairs,
+        .pair_count    = SOCD_PAIR_COUNT,
+        .save          = save_socd_config,
+    };
+    socd_config_init(&socd_context);
+
     keyboard_post_init_user();
 }
