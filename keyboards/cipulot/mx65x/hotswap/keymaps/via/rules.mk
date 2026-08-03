@@ -1,3 +1,6 @@
 ENCODER_MAP_ENABLE = yes
 VIA_ENABLE = yes
-SRC += hotswap.c via_socd.c
+
+include keyboards/cipulot/common/mx_config.mk
+
+SRC += keyboards/cipulot/mx65x/mx65x_via.c

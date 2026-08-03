@@ -4,7 +4,7 @@
 
 #include QMK_KEYBOARD_H
 
-#include "mx.h"
+#include "keyboards/cipulot/common/general/mx/runtime/mx_runtime_features_keymap.h"
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format off
@@ -37,14 +37,3 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     )
     // clang-format on
 };
-
-bool process_record_user(uint16_t keycode, keyrecord_t *record) {
-    if (record->event.pressed) {
-        keypress = true;
-    }
-    else {
-        keypress = false;
-    }
-    indicators_callback();
-    return true;
-}
