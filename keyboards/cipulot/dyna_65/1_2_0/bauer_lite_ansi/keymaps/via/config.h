@@ -6,5 +6,5 @@
 
 #include "keyboards/cipulot/common/shared/runtime/runtime_features_config.h"
 
-#define VIA_FIRMWARE_VERSION 4
-#define FEATURE_CONFIG_VERSION 4
+#define VIA_FIRMWARE_VERSION 1
+#define FEATURE_CONFIG_VERSION 1
