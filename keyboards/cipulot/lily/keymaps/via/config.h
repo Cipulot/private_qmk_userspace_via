@@ -11,7 +11,6 @@
 
 // Lily retains four VIA layers by storing eight rather than sixteen Tap Dance slots.
 #define FEATURE_TAP_DANCE_COUNT 8
-#define FEATURE_CONFIG_EEPROM_SIZE 248
 
 #include "keyboards/cipulot/common/general/mx/runtime/mx_runtime_features_config.h"
 

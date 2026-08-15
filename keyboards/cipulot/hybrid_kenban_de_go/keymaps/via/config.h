@@ -4,7 +4,7 @@
 
 #pragma once
 
-#define VIA_FIRMWARE_VERSION 4
-#define FEATURE_CONFIG_VERSION 4
+#define VIA_FIRMWARE_VERSION 5
+#define FEATURE_CONFIG_VERSION 5
 
 #include "keyboards/cipulot/common/shared/runtime/runtime_features_config.h"

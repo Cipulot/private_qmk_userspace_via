@@ -5,7 +5,7 @@
 #pragma once
 
 // This is the firmware version for VIA support to avoid conflicts on menu fetching
-#define VIA_FIRMWARE_VERSION 4
-#define FEATURE_CONFIG_VERSION 4
+#define VIA_FIRMWARE_VERSION 5
+#define FEATURE_CONFIG_VERSION 5
 
 #include "keyboards/cipulot/common/general/ec/runtime/ec_runtime_features_config.h"

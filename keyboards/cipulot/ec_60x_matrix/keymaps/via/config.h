@@ -6,7 +6,7 @@
 
 #define VIA_EEPROM_LAYOUT_OPTIONS_SIZE 2
 
-#define VIA_FIRMWARE_VERSION 3
-#define FEATURE_CONFIG_VERSION 3
+#define VIA_FIRMWARE_VERSION 4
+#define FEATURE_CONFIG_VERSION 4
 
 #include "keyboards/cipulot/common/general/ec/runtime/ec_runtime_features_config.h"

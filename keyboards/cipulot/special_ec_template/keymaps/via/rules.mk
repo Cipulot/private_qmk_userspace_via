@@ -5,6 +5,7 @@ OPT_DEFS += -DCIPULOT_EC_SWITCH_MATRIX_HEADER=\"keyboards/cipulot/special_ec_tem
 
 include keyboards/cipulot/common/config_services.mk
 include keyboards/cipulot/common/runtime_features.mk
+include keyboards/cipulot/common/analog_runtime_features.mk
 
 SRC += keyboards/cipulot/common/general/ec/ec_config.c
 SRC += keyboards/cipulot/common/general/ec/runtime/ec_runtime_features.c
