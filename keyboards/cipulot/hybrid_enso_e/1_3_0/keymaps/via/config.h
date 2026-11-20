@@ -4,9 +4,7 @@
 
 #pragma once
 
-#define VIA_FIRMWARE_VERSION 1
-#define FEATURE_CONFIG_VERSION 1
+#define VIA_FIRMWARE_VERSION 2
+#define FEATURE_CONFIG_VERSION 2
 
 #include "keyboards/cipulot/common/shared/runtime/runtime_features_keyboard_config.h"
-
-#define HYBRID_DEBUG_KEY_EVENTS
